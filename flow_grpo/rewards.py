@@ -166,7 +166,7 @@ def geneval_score(device):
     import pickle
 
     batch_size = 64
-    url = "http://127.0.0.1:18085"
+    url = "http://127.0.0.1:6001" # custom
     sess = requests.Session()
     retries = Retry(
         total=1000, backoff_factor=1, status_forcelist=[500], allowed_methods=False

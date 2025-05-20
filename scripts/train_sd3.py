@@ -5,6 +5,15 @@ import datetime
 from concurrent import futures
 import time
 import json
+import debugpy
+try:
+    debugpy.listen(('0.0.0.0', 8897))
+    print(f"Process waiting for debugger to attach on port 8897...")
+    debugpy.wait_for_client()
+except Exception as e:
+    print(f"Debugpy initialization failed: {e}")
+import os
+os.environ['PYDEVD_WARN_SLOW_RESOLVE_TIMEOUT'] = '10.0'  # 设置为5秒
 from absl import app, flags
 from accelerate import Accelerator
 from ml_collections import config_flags
@@ -15,6 +24,9 @@ from diffusers.loaders import AttnProcsLayers
 from diffusers.utils.torch_utils import is_compiled_module
 from diffusers.training_utils import compute_density_for_timestep_sampling, compute_loss_weighting_for_sd3
 import numpy as np
+import sys
+sys.path.append("/openseg_blob/zhaoyaqi/flow_grpo")
+import os
 import flow_grpo.prompts
 import flow_grpo.rewards
 from flow_grpo.stat_tracking import PerPromptStatTracker
@@ -365,6 +377,7 @@ def main(_):
                 sorted(checkpoints, key=lambda x: int(x.split("_")[-1]))[-1],
             )
 
+    # TODO: timestep_fraction?
     # number of timesteps within each trajectory to train on
     num_train_timesteps = int(config.sample.num_steps * config.train.timestep_fraction)
 
@@ -384,9 +397,11 @@ def main(_):
         gradient_accumulation_steps=config.train.gradient_accumulation_steps
         * num_train_timesteps,
     )
+
+
     if accelerator.is_main_process:
         accelerator.init_trackers(
-            project_name="flow-grpo",
+            project_name="mia-flow-grpo",
             config=config.to_dict(),
             init_kwargs={"wandb": {"name": config.run_name}},
         )
@@ -464,6 +479,8 @@ def main(_):
     
     transformer = pipeline.transformer
     transformer_trainable_parameters = list(filter(lambda p: p.requires_grad, transformer.parameters()))
+    
+    # TODO: ema?
     # 平均影响到之前的20*8=160个step
     ema = EMAModuleWrapper(transformer_trainable_parameters, decay=0.9, update_step_interval=8, device=accelerator.device)
     
@@ -591,7 +608,7 @@ def main(_):
         config.sample.train_batch_size
         * accelerator.num_processes
         * config.sample.num_batches_per_epoch
-    )
+    ) # 1个epoch, 24个batch，对应24*12=288个样本
     total_train_batch_size = (
         config.train.batch_size
         * accelerator.num_processes
@@ -632,6 +649,7 @@ def main(_):
         pipeline.transformer.eval()
         samples = []
         prompts = []
+        # step
         for i in tqdm(
             range(config.sample.num_batches_per_epoch),
             desc=f"Epoch {epoch}: sampling",
@@ -656,8 +674,10 @@ def main(_):
                 return_tensors="pt",
             ).input_ids.to(accelerator.device)
             if i==0 and epoch % config.eval_freq == 0 and epoch>0:
+                # eval
                 eval(pipeline, test_dataloader, text_encoders, tokenizers, config, accelerator, global_step, eval_reward_fn, executor, autocast, num_train_timesteps, ema, transformer_trainable_parameters)
             if i==0 and epoch % config.save_freq == 0 and epoch>0 and accelerator.is_main_process:
+                # save? optimizer?
                 save_ckpt(config.save_dir, transformer, global_step, accelerator, ema, transformer_trainable_parameters, config)
             # 这里是故意的，因为前两个epoch收集的group size会有bug,经过两个epoch后，group_size稳定成指定的
             if epoch < 2:
@@ -671,7 +691,7 @@ def main(_):
                         pooled_prompt_embeds=pooled_prompt_embeds,
                         negative_prompt_embeds=sample_neg_prompt_embeds,
                         negative_pooled_prompt_embeds=sample_neg_pooled_prompt_embeds,
-                        num_inference_steps=config.sample.num_steps,
+                        num_inference_steps=config.sample.num_steps, # 10
                         guidance_scale=config.sample.guidance_scale,
                         output_type="pt",
                         return_dict=False,

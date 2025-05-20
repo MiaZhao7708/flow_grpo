@@ -1,0 +1,16 @@
+{
+    "name": "FLOW_RL",
+    "image": "xiaochen233/flow_rl:latest",
+    "containerName": "zyq_grpo",
+    "runArgs": [
+        "--gpus=all",
+        "--runtime=nvidia"
+    ],
+    "mounts": [
+        "source=/home/wkm/openseg_blob,target=/openseg_blob,type=bind",
+        "source=/home/wkm/detr_blob,target=/detr_blob,type=bind"
+    ],
+    "workspaceFolder": "/openseg_blob/zhaoyaqi/flow_grpo",
+    "remoteUser": "root",
+    "forwardPorts": [6001, 6002, 6003, 6005, 6006, 8888]
+}
