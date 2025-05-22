@@ -353,6 +353,25 @@ def save_ckpt(save_dir, transformer, global_step, accelerator, ema, transformer_
         unwrap_model(transformer, accelerator).save_pretrained(save_root_lora)
         if config.train.ema:
             ema.copy_temp_to(transformer_trainable_parameters)
+    
+    # added by yaqi,save state
+        if config.train.ema:
+            ema_state_dict = ema.state_dict()
+            torch.save(ema_state_dict, os.path.join(save_root, "ema.pt"))
+            
+    # 完整训练状态（包含优化器状态）
+    accelerator.save_state(os.path.join(save_root, "accelerator_state"))
+    
+    # 其他训练元数据
+    if accelerator.is_main_process:
+        metadata = {
+            "global_step": global_step,
+            "config": config.to_dict(),
+        }
+        with open(os.path.join(save_root, "metadata.json"), "w") as f:
+            json.dump(metadata, f, indent=4)
+    
+    logger.info(f"Model checkpoint saved at {save_root}")
 
 def main(_):
     # basic Accelerate and logging setup
@@ -366,17 +385,29 @@ def main(_):
 
     if config.resume_from:
         config.resume_from = os.path.normpath(os.path.expanduser(config.resume_from))
-        if "checkpoint_" not in os.path.basename(config.resume_from):
-            # get the most recent checkpoint in this directory
-            checkpoints = list(
-                filter(lambda x: "checkpoint_" in x, os.listdir(config.resume_from))
-            )
+        # if "checkpoint_" not in os.path.basename(config.resume_from):
+        #     # get the most recent checkpoint in this directory
+        #     checkpoints = list(
+        #         filter(lambda x: "checkpoint_" in x, os.listdir(config.resume_from))
+        #     )
+        # 如果提供的是检查点的根目录，查找最新的检查点
+        if not os.path.basename(config.resume_from).startswith("checkpoint-"):
+            checkpoints = [
+                d for d in os.listdir(config.resume_from) 
+                if os.path.isdir(os.path.join(config.resume_from, d)) and d.startswith("checkpoint-")
+            ]
             if len(checkpoints) == 0:
                 raise ValueError(f"No checkpoints found in {config.resume_from}")
-            config.resume_from = os.path.join(
-                config.resume_from,
-                sorted(checkpoints, key=lambda x: int(x.split("_")[-1]))[-1],
-            )
+            # config.resume_from = os.path.join(
+            #     config.resume_from,
+            #     sorted(checkpoints, key=lambda x: int(x.split("_")[-1]))[-1],
+            # )            
+            # 根据检查点编号排序，选择最新的
+            latest_checkpoint = sorted(checkpoints, key=lambda x: int(x.split("-")[-1]))[-1]
+            config.resume_from = os.path.join(config.resume_from, latest_checkpoint)
+            logger.info(f"Found latest checkpoint: {latest_checkpoint}")
+        
+        logger.info(f"Will resume from checkpoint: {config.resume_from}")
 
     # TODO: timestep_fraction?
     # number of timesteps within each trajectory to train on
@@ -638,11 +669,41 @@ def main(_):
 
     if config.resume_from:
         logger.info(f"Resuming from {config.resume_from}")
-        accelerator.load_state(config.resume_from)
-        first_epoch = int(config.resume_from.split("_")[-1]) + 1
+        # changed by yaqi
+        # accelerator.load_state(config.resume_from)
+        # first_epoch = int(config.resume_from.split("_")[-1]) + 1
+        # 使用accelerator加载训练状态（包括优化器状态等）
+        accelerator_state_path = os.path.join(config.resume_from, "accelerator_state")
+        accelerator.load_state(accelerator_state_path)
+        
+        # 加载EMA状态
+        if config.train.ema:
+            ema_state_path = os.path.join(config.resume_from, "ema.pt")
+            if os.path.exists(ema_state_path):
+                ema_state_dict = torch.load(ema_state_path, map_location=accelerator.device)
+                ema.load_state_dict(ema_state_dict)
+                logger.info(f"Loaded EMA state from {ema_state_path}")
+            else:
+                logger.warning(f"EMA state file {ema_state_path} not found, skipping EMA resume")
+        
+        # 加载元数据信息
+        metadata_path = os.path.join(config.resume_from, "metadata.json")
+        if os.path.exists(metadata_path):
+            with open(metadata_path, 'r') as f:
+                metadata = json.load(f)
+                global_step = metadata.get("global_step", 0)
+                logger.info(f"Resumed global_step: {global_step}")
+        else:
+            # 如果没有元数据文件，则从目录名推断
+            first_epoch = int(os.path.basename(config.resume_from).split("-")[-1])
+            global_step = first_epoch  # 这是一个近似值，实际可能需要更精确的计算
+
+        ratio = config.sample.num_batches_per_epoch // config.train.gradient_accumulation_steps
+        first_epoch = global_step // ratio + 1
+        logger.info(f"Resuming from epoch {first_epoch}, global step {global_step}")
     else:
         first_epoch = 0
-    global_step = 0
+        global_step = 0
     train_iter = iter(train_dataloader)
 
     for epoch in range(first_epoch, config.num_epochs):
@@ -912,6 +973,7 @@ def main(_):
             # train
             pipeline.transformer.train()
             info = defaultdict(list)
+            # 1-24
             for i, sample in tqdm(
                 list(enumerate(samples_batched)),
                 desc=f"Epoch {epoch}.{inner_epoch}: training",
@@ -931,6 +993,7 @@ def main(_):
                     pooled_embeds = sample["pooled_prompt_embeds"]
 
                 train_timesteps = [step_index  for step_index in range(num_train_timesteps)]
+                # 1-9
                 for j in tqdm(
                     train_timesteps,
                     desc="Timestep",

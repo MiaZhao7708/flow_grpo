@@ -53,7 +53,7 @@ def general_ocr_sd3():
     config.sample.test_batch_size = 16 # 11 is a special design, the test set has a total of 1018, to make 8*16*n as close as possible to 1018, because when the number of samples cannot be divided evenly by the number of cards, multi-card will fill the last batch to ensure each card has the same number of samples, affecting gradient synchronization.
 
     config.train.batch_size = config.sample.train_batch_size
-    config.train.gradient_accumulation_steps = config.sample.num_batches_per_epoch//2
+    config.train.gradient_accumulation_steps = config.sample.num_batches_per_epoch//2 # 12/2=6
     config.train.num_inner_epochs = 1
     config.train.timestep_fraction = 0.99
     # kl loss
@@ -97,7 +97,7 @@ def geneval_sd3():
     config.sample.test_batch_size = 14 # This bs is a special design, the test set has a total of 2212, to make gpu_num*bs*n as close as possible to 2212, because when the number of samples cannot be divided evenly by the number of cards, multi-card will fill the last batch to ensure each card has the same number of samples, affecting gradient synchronization.
 
     config.train.batch_size = config.sample.train_batch_size
-    config.train.gradient_accumulation_steps = config.sample.num_batches_per_epoch//2
+    config.train.gradient_accumulation_steps = config.sample.num_batches_per_epoch//2 # 24/2=12
     config.train.num_inner_epochs = 1
     config.train.timestep_fraction = 0.99
     config.train.beta = 0.01
