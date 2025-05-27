@@ -228,6 +228,77 @@ def geneval_score(device):
 
     return _fn
 
+def geneval_score_debug(device):
+    """Submits images to GenEval and computes a reward.
+    """
+    import requests
+    from requests.adapters import HTTPAdapter, Retry
+    from io import BytesIO
+    import pickle
+
+    batch_size = 64
+    url = "http://127.0.0.1:6002" # custom
+    sess = requests.Session()
+    retries = Retry(
+        total=1000, backoff_factor=1, status_forcelist=[500], allowed_methods=False
+    )
+    sess.mount("http://", HTTPAdapter(max_retries=retries))
+
+    def _fn(images, prompts, metadatas, only_strict):
+        del prompts
+        if isinstance(images, torch.Tensor):
+            images = (images * 255).round().clamp(0, 255).to(torch.uint8).cpu().numpy()
+            images = images.transpose(0, 2, 3, 1)  # NCHW -> NHWC
+        images_batched = np.array_split(images, np.ceil(len(images) / batch_size))
+        metadatas_batched = np.array_split(metadatas, np.ceil(len(metadatas) / batch_size))
+        all_scores = []
+        all_rewards = []
+        all_strict_rewards = []
+        all_group_strict_rewards = []
+        all_group_rewards = []
+        for image_batch, metadata_batched in zip(images_batched, metadatas_batched):
+            jpeg_images = []
+
+            # Compress the images using JPEG
+            for image in image_batch:
+                img = Image.fromarray(image)
+                buffer = BytesIO()
+                img.save(buffer, format="JPEG")
+                jpeg_images.append(buffer.getvalue())
+
+            # format for LLaVA server
+            data = {
+                "images": jpeg_images,
+                "meta_datas": list(metadata_batched),
+                "only_strict": only_strict,
+            }
+            data_bytes = pickle.dumps(data)
+
+            # send a request to the llava server
+            response = sess.post(url, data=data_bytes, timeout=120)
+            response_data = pickle.loads(response.content)
+
+            all_scores += response_data["scores"]
+            all_rewards += response_data["rewards"]
+            all_strict_rewards += response_data["strict_rewards"]
+            all_group_strict_rewards.append(response_data["group_strict_rewards"])
+            all_group_rewards.append(response_data["group_rewards"])
+        all_group_strict_rewards_dict = defaultdict(list)
+        all_group_rewards_dict = defaultdict(list)
+        for current_dict in all_group_strict_rewards:
+            for key, value in current_dict.items():
+                all_group_strict_rewards_dict[key].extend(value)
+        all_group_strict_rewards_dict = dict(all_group_strict_rewards_dict)
+
+        for current_dict in all_group_rewards:
+            for key, value in current_dict.items():
+                all_group_rewards_dict[key].extend(value)
+        all_group_rewards_dict = dict(all_group_rewards_dict)
+
+        return all_scores, all_rewards, all_strict_rewards, all_group_rewards_dict, all_group_strict_rewards_dict
+
+    return _fn
+
 def unifiedreward_score_remote(device):
     """Submits images to DeQA and computes a reward.
     """
@@ -368,6 +439,7 @@ def multi_score(device, score_dict):
         "jpeg_compressibility": jpeg_compressibility,
         "unifiedreward": unifiedreward_score_sglang,
         "geneval": geneval_score,
+        "geneval_debug": geneval_score_debug,
     }
     score_fns={}
     for score_name, weight in score_dict.items():
@@ -379,7 +451,7 @@ def multi_score(device, score_dict):
         score_details = {}
         
         for score_name, weight in score_dict.items():
-            if score_name == "geneval":
+            if score_name == "geneval" or score_name == "geneval_debug":
                 scores, rewards, strict_rewards, group_rewards, group_strict_rewards = score_fns[score_name](images, prompts, metadata, only_strict)
                 score_details['accuracy'] = rewards
                 score_details['strict_accuracy'] = strict_rewards

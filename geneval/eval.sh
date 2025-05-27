@@ -1,7 +1,8 @@
 #! /bin/bash
 
 # NAME="sd-3.5-m-base"
-STEP=316
+# STEP=316
+STEP=596
 
 cleanup() {
     echo "Cleaning up..."

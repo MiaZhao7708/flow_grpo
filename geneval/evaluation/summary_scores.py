@@ -20,7 +20,7 @@ with open(os.path.join(os.path.dirname(__file__), "object_names.txt")) as cls_fi
 # Load results
 base_dir = "/openseg_blob/zhaoyaqi/workspace/flow_grpo/geneval/summary_scores"
 os.makedirs(base_dir, exist_ok=True)
-df = pd.read_json(os.path.join(base_dir, args.imagedir, "results.jsonl"), orient="records", lines=True)
+df = pd.read_json(os.path.join(base_dir.replace('summary_scores', 'output_eval'), args.imagedir, "results.jsonl"), orient="records", lines=True)
 
 # Measure overall success
 
@@ -47,6 +47,7 @@ print(f"Overall score (avg. over tasks): {np.mean(task_scores):.5f}")
 
 # Save results
 output_path = os.path.join(base_dir, args.imagedir, "summary_scores.txt")
+os.makedirs(os.path.dirname(output_path), exist_ok=True)
 with open(output_path, "w") as f:
     f.write(f"Total images: {len(df)}\n")
     f.write(f"Total prompts: {len(df.groupby('metadata'))}\n")

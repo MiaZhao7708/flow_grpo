@@ -6,12 +6,14 @@ from concurrent import futures
 import time
 import json
 import debugpy
+
 try:
-    debugpy.listen(('0.0.0.0', 8897))
-    print(f"Process waiting for debugger to attach on port 8897...")
+    debugpy.listen(('0.0.0.0', 8899))
+    print(f"Process waiting for debugger to attach on port 8899...")
     debugpy.wait_for_client()
 except Exception as e:
     print(f"Debugpy initialization failed: {e}")
+
 import os
 os.environ['PYDEVD_WARN_SLOW_RESOLVE_TIMEOUT'] = '10.0'  # 设置为5秒
 from absl import app, flags
@@ -151,6 +153,27 @@ def set_adapter_and_freeze_params(transformer, adapter_name):
             param.requires_grad_(True)
         elif "ref" in name:
             param.requires_grad_(False)
+
+def load_lora_weights(pipeline, merge_lora_path):    
+    """Load and fuse LoRA weights into the pipeline's transformer.
+    
+    Args:
+        pipeline: The diffusion pipeline
+        merge_lora_path: Path to LoRA weights, can be a string or list of strings
+    """
+    if isinstance(merge_lora_path, str):
+        pretrained_lora_ckpt_path_list = [merge_lora_path]
+    else:
+        pretrained_lora_ckpt_path_list = merge_lora_path  # fuse multiple lora weights
+        
+    for pretrained_lora_ckpt in pretrained_lora_ckpt_path_list:
+        lora_state_dict = pipeline.lora_state_dict(pretrained_lora_ckpt,strict=False)
+        pipeline.load_lora_into_transformer(lora_state_dict, pipeline.transformer)
+        pipeline.transformer.fuse_lora(safe_fusing=True)
+
+        pipeline.transformer.unload_lora()
+        logger.info(f"[INFO] loaded pretrained lora weights from {pretrained_lora_ckpt} and fused the lora to the base model")
+        print(f"[INFO] loaded pretrained lora weights from {pretrained_lora_ckpt} and fused the lora to the base model")
 
 def calculate_zero_std_ratio(prompts, gathered_rewards):
     """
@@ -415,6 +438,13 @@ def main(_):
     pipeline = StableDiffusion3Pipeline.from_pretrained(
         config.pretrained.model
     )
+
+    # added by yaqi
+    if config.get('merge_lora_path', None):
+        load_lora_weights(pipeline, config.merge_lora_path)
+        transformer = pipeline.transformer
+
+
     # freeze parameters of models to save more memory
     pipeline.vae.requires_grad_(False)
     pipeline.text_encoder.requires_grad_(False)
@@ -609,12 +639,13 @@ def main(_):
         config.sample.train_batch_size
         * accelerator.num_processes
         * config.sample.num_batches_per_epoch
-    ) # 1个epoch, 24个batch，对应24*12=288个样本
+    ) # 6*4*24=576个img
+    
     total_train_batch_size = (
         config.train.batch_size
         * accelerator.num_processes
         * config.train.gradient_accumulation_steps
-    )
+    ) # 6*4*12=288
 
     logger.info("***** Running training *****")
     logger.info(f"  Num Epochs = {config.num_epochs}")
@@ -674,15 +705,19 @@ def main(_):
                 truncation=True,
                 return_tensors="pt",
             ).input_ids.to(accelerator.device)
+            
             if i==0 and epoch % config.eval_freq == 0 and epoch>0:
                 # eval
                 eval(pipeline, test_dataloader, text_encoders, tokenizers, config, accelerator, global_step, eval_reward_fn, executor, autocast, num_train_timesteps, ema, transformer_trainable_parameters)
+            
             if i==0 and epoch % config.save_freq == 0 and epoch>0 and accelerator.is_main_process:
                 # save? optimizer?
                 save_ckpt(config.save_dir, transformer, global_step, accelerator, ema, transformer_trainable_parameters, config)
+
             # 这里是故意的，因为前两个epoch收集的group size会有bug,经过两个epoch后，group_size稳定成指定的
             if epoch < 2:
                 continue
+            
             # sample
             with autocast():
                 with torch.no_grad():
@@ -703,26 +738,26 @@ def main(_):
 
             latents = torch.stack(
                 latents, dim=1
-            )  # (batch_size, num_steps + 1, 16, 96, 96)
-            log_probs = torch.stack(log_probs, dim=1)  # shape after stack (batch_size, num_steps)
-            kls = torch.stack(kls, dim=1) 
+            )  # (batch_size, num_steps + 1, 16, 96, 96) [6,11,16,96,96]
+            log_probs = torch.stack(log_probs, dim=1)  # shape after stack (batch_size, num_steps) [6,10]
+            kls = torch.stack(kls, dim=1) # [6,10]
             kl = kls.detach()
 
             timesteps = pipeline.scheduler.timesteps.repeat(
                 config.sample.train_batch_size, 1
-            )  # (batch_size, num_steps)
+            )  # (batch_size, num_steps) [6,10] [1000,..,8.9]
 
             # compute rewards asynchronously
             rewards = executor.submit(reward_fn, images, prompts, prompt_metadata, only_strict=True)
             # yield to to make sure reward computation starts
             time.sleep(0)
-
+            # check, prompt_metadata and rewards return
             samples.append(
                 {
                     "prompt_ids": prompt_ids,
                     "prompt_embeds": prompt_embeds,
                     "pooled_prompt_embeds": pooled_prompt_embeds,
-                    "timesteps": timesteps,
+                    "timesteps": timesteps, 
                     "latents": latents[
                         :, :-1
                     ],  # each entry is the latent before timestep t
@@ -737,6 +772,7 @@ def main(_):
 
         if epoch < 2:
             continue
+        
         # wait for all rewards to be computed
         for sample in tqdm(
             samples,
@@ -760,8 +796,8 @@ def main(_):
                 for sub_key in samples[0][k]
             }
             for k in samples[0].keys()
-        }
-
+        } # 6*24 = 144 [144,77]/[144,10,16,64,64]/[144]
+        
         if epoch % 10 == 0 and accelerator.is_main_process:
             # this is a hack to force wandb to log the images as JPEGs instead of PNGs
             with tempfile.TemporaryDirectory() as tmpdir:
@@ -792,6 +828,7 @@ def main(_):
                     step=global_step,
                 )
         samples["rewards"]["ori_avg"] = samples["rewards"]["avg"]
+        # kl in reward
         samples["rewards"]["avg"] = samples["rewards"]["avg"].unsqueeze(-1) - config.sample.kl_reward*samples["kl"]
         # gather rewards across processes
         gathered_rewards = {key: accelerator.gather(value) for key, value in samples["rewards"].items()}
@@ -809,6 +846,7 @@ def main(_):
 
         # per-prompt mean/std tracking
         if config.per_prompt_stat_tracking:
+            # 每个提示词，group内计算advantage
             # gather the prompts across processes
             prompt_ids = accelerator.gather(samples["prompt_ids"]).cpu().numpy()
             prompts = pipeline.tokenizer.batch_decode(
@@ -849,7 +887,7 @@ def main(_):
         del samples["prompt_ids"]
 
         # Get the mask for samples where all advantages are zero across the time dimension
-        mask = (samples["advantages"].abs().sum(dim=1) != 0)
+        mask = (samples["advantages"].abs().sum(dim=1) != 0) # mask无效样本 [144,10], filter
         
         # If the number of True values in mask is not divisible by config.sample.num_batches_per_epoch,
         # randomly change some False values to True to make it divisible
@@ -870,7 +908,7 @@ def main(_):
         # Filter out samples where the entire time dimension of advantages is zero
         samples = {k: v[mask] for k, v in samples.items()}
 
-        total_batch_size, num_timesteps = samples["timesteps"].shape
+        total_batch_size, num_timesteps = samples["timesteps"].shape # [144,10]
         # assert (
         #     total_batch_size
         #     == config.sample.train_batch_size * config.sample.num_batches_per_epoch
@@ -891,23 +929,24 @@ def main(_):
                     torch.arange(num_timesteps, device=accelerator.device)
                     for _ in range(total_batch_size)
                 ]
-            )
+            ) # 144,10 
             for key in ["timesteps", "latents", "next_latents", "log_probs"]:
                 samples[key] = samples[key][
                     torch.arange(total_batch_size, device=accelerator.device)[:, None],
                     perms,
                 ]
-
+            
+            # 6*24 = 144/24 = 6
             # rebatch for training
             samples_batched = {
                 k: v.reshape(-1, total_batch_size//config.sample.num_batches_per_epoch, *v.shape[1:])
                 for k, v in samples.items()
-            }
+            } # 24,6,205,4096
 
             # dict of lists -> list of dicts for easier iteration
             samples_batched = [
                 dict(zip(samples_batched, x)) for x in zip(*samples_batched.values())
-            ]
+            ] # len-24
 
             # train
             pipeline.transformer.train()
@@ -930,6 +969,7 @@ def main(_):
                     embeds = sample["prompt_embeds"]
                     pooled_embeds = sample["pooled_prompt_embeds"]
 
+                # 10-1=9
                 train_timesteps = [step_index  for step_index in range(num_train_timesteps)]
                 for j in tqdm(
                     train_timesteps,
@@ -939,28 +979,38 @@ def main(_):
                     disable=not accelerator.is_local_main_process,
                 ):
                     with accelerator.accumulate(transformer):
+                        # batch 12 -- update
                         with autocast():
+                            # sample['latents] [bs,10,16,64,64],取第j个timestep的latent,用当前模型算出prev_sample以及log_prob
+                            # [bs,16,64,64]; [bs]; [bs,16,64,64]; [bs,1,1,1]
                             prev_sample, log_prob, prev_sample_mean, std_dev_t = compute_log_prob(transformer, pipeline, sample, j, embeds, pooled_embeds, config)
+                            
                             if config.train.beta > 0:
                                 with torch.no_grad():
                                     with transformer.module.disable_adapter():
+                                        # reference
                                         prev_sample_ref, log_prob_ref, prev_sample_mean_ref, std_dev_t_ref = compute_log_prob(transformer, pipeline, sample, j, embeds, pooled_embeds, config)
-
+                        # print(f"sample: {i}, timestep: {j}, std_dev_t: {std_dev_t}")
+                        # print(f"sample: {i}, timestep: {j}, std_dev_t_ref: {std_dev_t_ref}")
+                        # print(f"Equal? {std_dev_t == std_dev_t_ref}")
                         # grpo logic
                         advantages = torch.clamp(
                             sample["advantages"][:, j],
                             -config.train.adv_clip_max,
                             config.train.adv_clip_max,
-                        )
-                        ratio = torch.exp(log_prob - sample["log_probs"][:, j])
+                        ) # adv_clip
+                        ratio = torch.exp(log_prob - sample["log_probs"][:, j]) # pi_log_prob and old_log_prob
+                        print(f"sample: {i}, timestep: {j}, ratio: {ratio}")
                         unclipped_loss = -advantages * ratio
                         clipped_loss = -advantages * torch.clamp(
                             ratio,
                             1.0 - config.train.clip_range,
                             1.0 + config.train.clip_range,
-                        )
+                        ) # clip
+
                         policy_loss = torch.mean(torch.maximum(unclipped_loss, clipped_loss))
                         if config.train.beta > 0:
+                            # gaussian dist kl divergence, eq(13) in paper
                             kl_loss = ((prev_sample_mean - prev_sample_mean_ref) ** 2).mean(dim=(1,2,3), keepdim=True) / (2 * std_dev_t ** 2)
                             kl_loss = torch.mean(kl_loss)
                             loss = policy_loss + config.train.beta * kl_loss
@@ -970,14 +1020,16 @@ def main(_):
                         info["approx_kl"].append(
                             0.5
                             * torch.mean((log_prob - sample["log_probs"][:, j]) ** 2)
-                        )
+                        ) # 策略更新幅度
+                        
                         info["clipfrac"].append(
                             torch.mean(
                                 (
                                     torch.abs(ratio - 1.0) > config.train.clip_range
                                 ).float()
                             )
-                        )
+                        ) # 裁剪频率
+                        
                         info["policy_loss"].append(policy_loss)
                         if config.train.beta > 0:
                             info["kl_loss"].append(kl_loss)
@@ -986,6 +1038,7 @@ def main(_):
 
                         # backward pass
                         accelerator.backward(loss)
+                        
                         if accelerator.sync_gradients:
                             accelerator.clip_grad_norm_(
                                 transformer.parameters(), config.train.max_grad_norm
@@ -1003,8 +1056,9 @@ def main(_):
                         info = accelerator.reduce(info, reduction="mean")
                         info.update({"epoch": epoch, "inner_epoch": inner_epoch})
                         accelerator.log(info, step=global_step)
-                        global_step += 1
+                        global_step += 1 # step to update
                         info = defaultdict(list)
+                
                 if config.train.ema:
                     ema.step(transformer_trainable_parameters, global_step)
             # make sure we did an optimization step at the end of the inner epoch

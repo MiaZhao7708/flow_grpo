@@ -38,6 +38,15 @@
           },
         },
         {
+          "name": "flow_grpo Debugger bizv03",
+          "type": "debugpy",
+          "request": "attach",
+          "connect": {
+            "host": "localhost",
+            "port": 8899
+          },
+        },
+        {
           "name": "reward-server Debugger",
           "type": "debugpy",
           "request": "attach",

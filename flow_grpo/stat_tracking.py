@@ -42,7 +42,7 @@ class PerPromptStatTracker:
 def main():
     tracker = PerPromptStatTracker()
     prompts = ['a', 'b', 'a', 'c', 'b', 'a']
-    rewards = [1, 2, 3, 4, 5, 6]
+    rewards = [1, 2, 3, 4, 5, 6] 
     advantages = tracker.update(prompts, rewards)
     print("Advantages:", advantages)
     avg_group_size, history_prompts = tracker.get_stats()

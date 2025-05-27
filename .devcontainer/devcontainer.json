@@ -1,14 +1,14 @@
 {
     "name": "FLOW_RL",
-    "image": "xiaochen233/flow_rl:latest",
+    "image": "miazhao/flow_grpo:v1",
     "containerName": "zyq_grpo",
     "runArgs": [
         "--gpus=all",
         "--runtime=nvidia"
     ],
     "mounts": [
-        "source=/home/wkm/openseg_blob,target=/openseg_blob,type=bind",
-        "source=/home/wkm/detr_blob,target=/detr_blob,type=bind"
+        "source=/home/zyq/openseg_blob,target=/openseg_blob,type=bind",
+        "source=/home/zyq/detr_blob,target=/detr_blob,type=bind"
     ],
     "workspaceFolder": "/openseg_blob/zhaoyaqi/flow_grpo",
     "remoteUser": "root",

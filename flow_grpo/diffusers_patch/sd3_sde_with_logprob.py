@@ -37,14 +37,15 @@ def sde_step_with_logprob(
         generator (`torch.Generator`, *optional*):
             A random number generator.
     """
-    step_index = [self.index_for_timestep(t) for t in timestep]
-    prev_step_index = [step+1 for step in step_index]
-    sigma = self.sigmas[step_index].view(-1, 1, 1, 1)
+    step_index = [self.index_for_timestep(t) for t in timestep] # 1000,0
+    prev_step_index = [step+1 for step in step_index] # 1
+
+    sigma = self.sigmas[step_index].view(-1, 1, 1, 1) # [11], 
     sigma_prev = self.sigmas[prev_step_index].view(-1, 1, 1, 1)
     sigma_max = self.sigmas[1].item()
     dt = sigma_prev - sigma
 
-    std_dev_t = torch.sqrt(sigma / (1 - torch.where(sigma == 1, sigma_max, sigma)))*0.7
+    std_dev_t = torch.sqrt(sigma / (1 - torch.where(sigma == 1, sigma_max, sigma)))*0.7 # noise level(sigma_t)
     
     # our sde
     prev_sample_mean = sample*(1+std_dev_t**2/(2*sigma)*dt)+model_output*(1+std_dev_t**2*(1-sigma)/(2*sigma))*dt
@@ -72,9 +73,9 @@ def sde_step_with_logprob(
         -((prev_sample.detach() - prev_sample_mean) ** 2) / (2 * ((std_dev_t * torch.sqrt(-1*dt))**2))
         - torch.log(std_dev_t * torch.sqrt(-1*dt))
         - torch.log(torch.sqrt(2 * torch.as_tensor(math.pi)))
-    )
+    ) # [6,16,64,64]
 
     # mean along all but batch dimension
-    log_prob = log_prob.mean(dim=tuple(range(1, log_prob.ndim)))
+    log_prob = log_prob.mean(dim=tuple(range(1, log_prob.ndim))) # [6]
     
     return prev_sample, log_prob, prev_sample_mean, std_dev_t * torch.sqrt(-1*dt)
