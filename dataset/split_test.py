@@ -15,7 +15,7 @@ def save_jsonl(data, file_path):
         for item in data:
             f.write(json.dumps(item) + "\n")
 
-def split_dataset(input_file, train_output, test_output, test_size=500):
+def split_dataset(input_file, train_output, test_output, min_num, max_num,test_size=250):
     # 读取所有数据
     all_data = load_jsonl(input_file)
     
@@ -23,18 +23,18 @@ def split_dataset(input_file, train_output, test_output, test_size=500):
     count_groups = defaultdict(list)
     for item in all_data:
         count = item['include'][0]['count']
-        if 1 <= count <= 10:  # 只关注1-10的数据
+        if min_num <= count <= max_num:  # 只关注1-10的数据
             count_groups[count].append(item)
     
     # 计算每个数字需要多少个样本
-    samples_per_count = test_size // 10  # 每个数字50个样本
+    samples_per_count = test_size // (max_num - min_num + 1)  # 每个数字50个样本
     
     # 选择测试集数据
     test_data = []
     train_data = all_data.copy()  # 首先复制所有数据
     
     # 对于每个数字1-10
-    for count in range(1, 11):
+    for count in range(min_num, max_num+1):
         if count in count_groups:
             # 随机选择指定数量的样本
             count_samples = count_groups[count]
@@ -61,19 +61,21 @@ def split_dataset(input_file, train_output, test_output, test_size=500):
     for item in test_data:
         count = item['include'][0]['count']
         test_distribution[count] += 1
-    for count in range(1, 11):
+    for count in range(min_num, max_num+1):
         print(f"Count {count}: {test_distribution[count]} samples")
 
 def main():
-    input_file = "/openseg_blob/zhaoyaqi/flow_grpo/dataset/counting/metadata_1_10.jsonl"
-    train_output = "/openseg_blob/zhaoyaqi/flow_grpo/dataset/counting/train_metadata.jsonl"
-    test_output = "/openseg_blob/zhaoyaqi/flow_grpo/dataset/counting/test_metadata.jsonl"
+    min_num = 1
+    max_num = 5
+    input_file = f"/openseg_blob/zhaoyaqi/flow_grpo/dataset/counting/metadata_{min_num}_{max_num}.jsonl"
+    train_output = f"/openseg_blob/zhaoyaqi/flow_grpo/dataset/counting/train_metadata_{min_num}_{max_num}.jsonl"
+    test_output = f"/openseg_blob/zhaoyaqi/flow_grpo/dataset/counting/test_metadata_{min_num}_{max_num}.jsonl"
     
     # 创建输出目录
     Path(train_output).parent.mkdir(parents=True, exist_ok=True)
     
     # 划分数据集
-    split_dataset(input_file, train_output, test_output)
+    split_dataset(input_file, train_output, test_output, min_num, max_num)
 
 if __name__ == "__main__":
     main()

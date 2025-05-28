@@ -23,7 +23,9 @@ huggingface_token = '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'
 torch.set_grad_enabled(False)
 
 # python generation/diffusers_generate.py \
-#     --outdir "sd-3.5-m-base"
+#     --metadata_file "/openseg_blob/zhaoyaqi/flow_grpo/dataset/counting/test_metadata.jsonl" \
+#     --outdir "sd-3.5-m-base-coco80-8k"
+#     --lora_step '/openseg_blob/zhaoyaqi/workspace/coco80_grpo_counting_sd3_5_medium/output/sd_3_5_medium_base_data_8k_coco80/checkpoint-1000'
  
 def seed_everything(seed=42):
     random.seed(seed)
@@ -55,7 +57,7 @@ def parse_args():
     parser.add_argument(
         "--n_samples",
         type=int,
-        default=4,
+        default=10,
         help="number of samples",
     )
     parser.add_argument(
@@ -108,7 +110,7 @@ def parse_args():
     parser.add_argument(
         "--batch_size",
         type=int,
-        default=4,
+        default=10,
         help="how many samples can be produced simultaneously",
     )
     parser.add_argument(
@@ -140,13 +142,18 @@ def main(opt):
         model = StableDiffusionPipeline.from_pretrained(opt.model, torch_dtype=torch.float16)
     device = torch.device("cuda") if torch.cuda.is_available() else torch.device("cpu")
     model = model.to(device)
+    # if opt.lora_step:
+    #     print(f'---------- Using LoRA model: {opt.lora_step} ----------')
+    #     lora_path = f'/openseg_blob/zhaoyaqi/workspace/flow_grpo/logs/geneval/sd3.5-M/checkpoints/checkpoint-{opt.lora_step}/lora'
+    #     model.transformer = PeftModel.from_pretrained(model.transformer, lora_path)
+    #     opt.outdir = f"sd-3.5-m-flow-grpo-step{opt.lora_step}"
     if opt.lora_step:
         print(f'---------- Using LoRA model: {opt.lora_step} ----------')
-        lora_path = f'/openseg_blob/zhaoyaqi/workspace/flow_grpo/logs/geneval/sd3.5-M/checkpoints/checkpoint-{opt.lora_step}/lora'
-        model.transformer = PeftModel.from_pretrained(model.transformer, lora_path)
-        opt.outdir = f"sd-3.5-m-flow-grpo-step{opt.lora_step}"
+        model.load_lora_weights(opt.lora_step)
     
-    base_outdir = "/openseg_blob/zhaoyaqi/workspace/flow_grpo/geneval/output_eval"
+    
+    # base_outdir = "/openseg_blob/zhaoyaqi/workspace/flow_grpo/coco_counting/output_eval"
+    base_outdir = '/openseg_blob/zhaoyaqi/workspace/coco80_grpo_counting_sd3_5_medium/output_eval'
     opt.outdir = os.path.join(base_outdir, opt.outdir)
     print(f"---------- Output directory: {opt.outdir} ----------")
     # model.enable_attention_slicing()

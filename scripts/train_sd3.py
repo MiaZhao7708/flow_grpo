@@ -7,12 +7,12 @@ import time
 import json
 import debugpy
 
-try:
-    debugpy.listen(('0.0.0.0', 8899))
-    print(f"Process waiting for debugger to attach on port 8899...")
-    debugpy.wait_for_client()
-except Exception as e:
-    print(f"Debugpy initialization failed: {e}")
+# try:
+#     debugpy.listen(('0.0.0.0', 8899))
+#     print(f"Process waiting for debugger to attach on port 8899...")
+#     debugpy.wait_for_client()
+# except Exception as e:
+#     print(f"Debugpy initialization failed: {e}")
 
 import os
 os.environ['PYDEVD_WARN_SLOW_RESOLVE_TIMEOUT'] = '10.0'  # 设置为5秒
