@@ -451,7 +451,8 @@ def multi_score(device, score_dict):
         score_details = {}
         
         for score_name, weight in score_dict.items():
-            if score_name == "geneval" or score_name == "geneval_debug":
+            if "geneval" in score_name:
+            # if score_name == "geneval" or score_name == "geneval_debug":
                 scores, rewards, strict_rewards, group_rewards, group_strict_rewards = score_fns[score_name](images, prompts, metadata, only_strict)
                 score_details['accuracy'] = rewards
                 score_details['strict_accuracy'] = strict_rewards
