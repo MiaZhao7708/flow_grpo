@@ -66,7 +66,7 @@ def generate_metadata(object_names, output_file, samples_per_object=5):
         # 获取正确的复数形式
         animal_plural = get_plural_form(animal)
         
-        for number in range(1, 6):
+        for number in range(1, 16):
             for prompt_template in prompt_list:
                 animal_str = animal_plural if number > 1 else animal
                 prompt = prompt_template.format(
@@ -95,7 +95,7 @@ def generate_metadata(object_names, output_file, samples_per_object=5):
 def main():
     # 设置路径
     object_names_path = "/openseg_blob/zhaoyaqi/flow_grpo/reward-server/reward_server/object_names.txt"
-    output_path = "/openseg_blob/zhaoyaqi/flow_grpo/dataset/counting_5/metadata_1_5.jsonl"
+    output_path = "/openseg_blob/zhaoyaqi/flow_grpo/dataset/counting_15/metadata_1_15.jsonl"
     
     # 确保输出目录存在
     Path(output_path).parent.mkdir(parents=True, exist_ok=True)
