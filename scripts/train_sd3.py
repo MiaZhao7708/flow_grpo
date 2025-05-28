@@ -17,7 +17,7 @@ except Exception as e:
 import os
 os.environ['PYDEVD_WARN_SLOW_RESOLVE_TIMEOUT'] = '10.0'  # 设置为5秒
 from absl import app, flags
-from accelerate import Accelerator
+from accelerate import Accelerator, DistributedType
 from ml_collections import config_flags
 from accelerate.utils import set_seed, ProjectConfiguration
 from accelerate.logging import get_logger
@@ -376,6 +376,15 @@ def save_ckpt(save_dir, transformer, global_step, accelerator, ema, transformer_
         unwrap_model(transformer, accelerator).save_pretrained(save_root_lora)
         if config.train.ema:
             ema.copy_temp_to(transformer_trainable_parameters)
+    
+        # added by yaqi
+        extra_state = {
+            "global_step": global_step,
+            "config": config.to_dict(),
+        }
+        
+        with open(os.path.join(save_root, "extra_state.json"), "w") as f:
+            json.dump(extra_state, f)
 
 def main(_):
     # basic Accelerate and logging setup
@@ -441,6 +450,7 @@ def main(_):
 
     # added by yaqi
     if config.get('merge_lora_path', None):
+        # sd3_5训练存储的lora
         load_lora_weights(pipeline, config.merge_lora_path)
         transformer = pipeline.transformer
 
@@ -670,12 +680,25 @@ def main(_):
     if config.resume_from:
         logger.info(f"Resuming from {config.resume_from}")
         accelerator.load_state(config.resume_from)
-        first_epoch = int(config.resume_from.split("_")[-1]) + 1
+        # changed by yaqi
+        # first_epoch = int(config.resume_from.split("_")[-1]) + 1
+        global_step = int(config.resume_from.split("_")[-1])
+        ratio = config.sample.num_batches_per_epoch // config.train.gradient_accumulation_steps
+        first_epoch = global_step // ratio + 1
+        logger.info(f"Resuming from epoch {first_epoch}, global step {global_step}")
     else:
         first_epoch = 0
-    global_step = 0
+        global_step = 0
+    # global_step = 0
     train_iter = iter(train_dataloader)
-
+    
+    # progress_bar = tqdm(
+    #     range(0, config.num_epochs * config.sample.num_batches_per_epoch // config.train.gradient_accumulation_steps),
+    #     initial=global_step,
+    #     desc="Steps",
+    #     # Only show the progress bar once on each machine.
+    #     disable=not accelerator.is_local_main_process,
+    # )
     for epoch in range(first_epoch, config.num_epochs):
         #################### SAMPLING ####################
         pipeline.transformer.eval()
@@ -713,6 +736,9 @@ def main(_):
             if i==0 and epoch % config.save_freq == 0 and epoch>0 and accelerator.is_main_process:
                 # save? optimizer?
                 save_ckpt(config.save_dir, transformer, global_step, accelerator, ema, transformer_trainable_parameters, config)
+                # save_path = os.path.join(config.save_dir, "checkpoints", f"checkpoint-{global_step}")
+                # accelerator.save_state(save_path)
+                # logger.info(f"Model checkpoint saved at {save_path}", main_process_only=False)
 
             # 这里是故意的，因为前两个epoch收集的group size会有bug,经过两个epoch后，group_size稳定成指定的
             if epoch < 2:
@@ -1000,7 +1026,7 @@ def main(_):
                             config.train.adv_clip_max,
                         ) # adv_clip
                         ratio = torch.exp(log_prob - sample["log_probs"][:, j]) # pi_log_prob and old_log_prob
-                        print(f"sample: {i}, timestep: {j}, ratio: {ratio}")
+                        # print(f"sample: {i}, timestep: {j}, ratio: {ratio}")
                         unclipped_loss = -advantages * ratio
                         clipped_loss = -advantages * torch.clamp(
                             ratio,
@@ -1048,13 +1074,16 @@ def main(_):
 
                     # Checks if the accelerator has performed an optimization step behind the scenes
                     if accelerator.sync_gradients:
+                        # progress_bar.update(1)
                         # assert (j == train_timesteps[-1]) and (
                         #     i + 1
                         # ) % config.train.gradient_accumulation_steps == 0
                         # log training-related stuff
                         info = {k: torch.mean(torch.stack(v)) for k, v in info.items()}
                         info = accelerator.reduce(info, reduction="mean")
+                        # info_note = {k: v.item() for k, v in info.items()}
                         info.update({"epoch": epoch, "inner_epoch": inner_epoch})
+                        # progress_bar.set_postfix(**info_note)
                         accelerator.log(info, step=global_step)
                         global_step += 1 # step to update
                         info = defaultdict(list)

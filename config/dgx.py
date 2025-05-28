@@ -128,7 +128,7 @@ def geneval_sd3_counting():
 
     # sd3.5 medium
     config.pretrained.model = "stabilityai/stable-diffusion-3.5-medium"
-    config.merge_lora_path = '/openseg_blob/zhaoyaqi/workspace/sd3_5_counting/output/sd3_5_medium_base_data_5k-rank16/checkpoint-1000'
+    config.merge_lora_path = '/openseg_blob/zhaoyaqi/workspace/coco80_grpo_counting_sd3_5_medium/output/sd_3_5_medium_base_data_8k_coco80/checkpoint-1000'
     config.sample.num_steps = 10 # 40
     config.sample.eval_num_steps = 40
     # config.sample.guidance_scale = 4.5
@@ -139,10 +139,11 @@ def geneval_sd3_counting():
     config.sample.train_batch_size = 6
     # config.sample.train_batch_size = 12 # 
     # config.sample.num_image_per_prompt = 24
-    # config.sample.num_image_per_prompt = 12 # device_num = 4
-    config.sample.num_image_per_prompt = 3 # device_num = 1 
+    # care!!!!!
+    config.sample.num_image_per_prompt = 12 # device_num = 4
+    # config.sample.num_image_per_prompt = 3 # device_num = 1 
     config.sample.num_batches_per_epoch = 24
-    config.sample.test_batch_size = 14 # This bs is a special design, the test set has a total of 2212, to make gpu_num*bs*n as close as possible to 2212, because when the number of samples cannot be divided evenly by the number of cards, multi-card will fill the last batch to ensure each card has the same number of samples, affecting gradient synchronization.
+    config.sample.test_batch_size = 10 # This bs is a special design, the test set has a total of 2212, to make gpu_num*bs*n as close as possible to 2212, because when the number of samples cannot be divided evenly by the number of cards, multi-card will fill the last batch to ensure each card has the same number of samples, affecting gradient synchronization.
 
     config.train.batch_size = config.sample.train_batch_size
     config.train.gradient_accumulation_steps = config.sample.num_batches_per_epoch//2 # 24/2=12
@@ -155,9 +156,9 @@ def geneval_sd3_counting():
     config.num_epochs = 100000
     # config.save_freq = 30 # epoch
     # config.eval_freq = 60
-    config.save_freq = 20 # epoch
+    config.save_freq = 10 # epoch
     config.eval_freq = 20
-    config.save_dir = '/openseg_blob/zhaoyaqi/workspace/flow_grpo/logs/geneval/sd3.5-M'
+    config.save_dir = '/openseg_blob/zhaoyaqi/workspace/flow_grpo/logs/counting_coco80/sd3.5-M'
     config.reward_fn = {
         "geneval_debug": 1.0,
         # "imagereward": 1.0,
