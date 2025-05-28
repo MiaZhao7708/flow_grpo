@@ -254,7 +254,7 @@ def geneval_sd3_counting():
     # config.eval_freq = 60
     config.save_freq = 10 # epoch
     config.eval_freq = 20
-    config.save_dir = '/openseg_blob/zhaoyaqi/workspace/flow_grpo/logs/counting_coco80/sd3.5-M'
+    config.save_dir = '/openseg_blob/zhaoyaqi/workspace/flow_grpo/logs/counting_coco80_10_step10_guidance_7/sd3.5-M'
     config.reward_fn = {
         "geneval_debug": 1.0,
         # "imagereward": 1.0,

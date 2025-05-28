@@ -11,8 +11,8 @@ def get_plural_form(word):
     # 特殊复数规则
     if word == "scissors":  # 已经是复数形式
         return word
-    elif word == "mouse":  # computer mouse的特殊情况
-        return "mice"
+    elif word.endswith("mouse"):  # computer mouse的特殊情况
+        return word.replace("mouse", "mice")
     elif word.endswith(("sh", "ch")):
         return word + "es"
     elif word.endswith("s"):  # glass -> glasses
@@ -22,18 +22,42 @@ def get_plural_form(word):
     else:
         return word + "s"
 
+def number_to_words(n):
+    # 定义阿拉伯数字到字母的映射
+    num_to_word = {
+        1: "one", 2: "two", 3: "three", 4: "four", 5: "five", 
+        6: "six", 7: "seven", 8: "eight", 9: "nine", 10: "ten", 
+        11: "eleven", 12: "twelve", 13: "thirteen", 14: "fourteen", 
+        15: "fifteen", 16: "sixteen", 17: "seventeen", 18: "eighteen", 
+        19: "nineteen", 20: "twenty", 30: "thirty", 40: "forty", 
+        50: "fifty"
+    }
+    
+    if n <= 20:
+        # import pdb; pdb.set_trace()
+        return num_to_word[n]
+    elif 21 <= n <= 50:
+        tens = (n // 10) * 10
+        ones = n % 10
+        if ones == 0:
+            return num_to_word[tens]
+        else:
+            return f"{num_to_word[tens]}-{num_to_word[ones]}"
+    else:
+        return "Number out of range"  # 可以根据需要调整
+
 # 提示模板
 prompt_list = [
-    "A composition of {gt_count} identical {animal_str}s scattered across a neutral gray background, each showing detailed textures and characteristic features with clean edges.",
-    "A dynamic arrangement of {gt_count} {animal_str}s randomly distributed on a soft gray backdrop, each precisely rendered with authentic details and materials.",
-    "An organic display of {gt_count} {animal_str}s dispersed naturally across a neutral gray background, each showcasing realistic textures and dimensional details.",
-    "A free-flowing layout of {gt_count} identical {animal_str}s spread throughout the frame against a gray backdrop, each captured with photographic precision and clear details.",
-    "A spontaneous composition of {gt_count} {animal_str}s distributed randomly against a gray background, each rendered with realistic materials and textures.",
-    "An informal arrangement showing {gt_count} {animal_str}s scattered organically on a neutral gray canvas, each depicted with authentic details and characteristic features.",
-    "A natural distribution of {gt_count} {animal_str}s spread across a gray background, each showing clear material textures and design details.",
-    "A varied arrangement of {gt_count} identical {animal_str}s randomly positioned against a clean gray backdrop, each rendered with precise details and realistic features.",
-    "A casual composition featuring {gt_count} {animal_str}s naturally dispersed on a neutral gray surface, each portrayed with authentic textures and clear design elements.",
-    "A free-form presentation of {gt_count} {animal_str}s scattered throughout the space on a soft gray background, each displaying realistic materials and precise details."
+    "A composition of {gt_count} identical {animal_str} scattered across a neutral gray background, each showing detailed textures and characteristic features with clean edges.",
+    "A dynamic arrangement of {gt_count} {animal_str} randomly distributed on a soft gray backdrop, each precisely rendered with authentic details and materials.",
+    "An organic display of {gt_count} {animal_str} dispersed naturally across a neutral gray background, each showcasing realistic textures and dimensional details.",
+    "A free-flowing layout of {gt_count} identical {animal_str} spread throughout the frame against a gray backdrop, each captured with photographic precision and clear details.",
+    "A spontaneous composition of {gt_count} {animal_str} distributed randomly against a gray background, each rendered with realistic materials and textures.",
+    "An informal arrangement showing {gt_count} {animal_str} scattered organically on a neutral gray canvas, each depicted with authentic details and characteristic features.",
+    "A natural distribution of {gt_count} {animal_str} spread across a gray background, each showing clear material textures and design details.",
+    "A varied arrangement of {gt_count} identical {animal_str} randomly positioned against a clean gray backdrop, each rendered with precise details and realistic features.",
+    "A casual composition featuring {gt_count} {animal_str} naturally dispersed on a neutral gray surface, each portrayed with authentic textures and clear design elements.",
+    "A free-form presentation of {gt_count} {animal_str} scattered throughout the space on a soft gray background, each displaying realistic materials and precise details."
 ]
 def generate_metadata(object_names, output_file, samples_per_object=5):
     metadata_list = []
@@ -46,7 +70,7 @@ def generate_metadata(object_names, output_file, samples_per_object=5):
             for prompt_template in prompt_list:
                 animal_str = animal_plural if number > 1 else animal
                 prompt = prompt_template.format(
-                    gt_count=number,
+                    gt_count=number_to_words(number),
                     animal_str=animal_str
                 )
                 metadata = {
@@ -71,7 +95,7 @@ def generate_metadata(object_names, output_file, samples_per_object=5):
 def main():
     # 设置路径
     object_names_path = "/openseg_blob/zhaoyaqi/flow_grpo/reward-server/reward_server/object_names.txt"
-    output_path = "/openseg_blob/zhaoyaqi/flow_grpo/dataset/counting/metadata_1_5.jsonl"
+    output_path = "/openseg_blob/zhaoyaqi/flow_grpo/dataset/counting_5/metadata_1_5.jsonl"
     
     # 确保输出目录存在
     Path(output_path).parent.mkdir(parents=True, exist_ok=True)

@@ -15,7 +15,7 @@ def save_jsonl(data, file_path):
         for item in data:
             f.write(json.dumps(item) + "\n")
 
-def split_dataset(input_file, train_output, test_output, min_num, max_num,test_size=250):
+def split_dataset(input_file, train_output, test_output, min_num, max_num,test_size=500):
     # 读取所有数据
     all_data = load_jsonl(input_file)
     
@@ -50,6 +50,7 @@ def split_dataset(input_file, train_output, test_output, min_num, max_num,test_s
     
     # 保存数据集
     save_jsonl(train_data, train_output)
+    random.shuffle(test_data)
     save_jsonl(test_data, test_output)
     
     # 打印统计信息
@@ -66,10 +67,10 @@ def split_dataset(input_file, train_output, test_output, min_num, max_num,test_s
 
 def main():
     min_num = 1
-    max_num = 5
+    max_num = 10
     input_file = f"/openseg_blob/zhaoyaqi/flow_grpo/dataset/counting/metadata_{min_num}_{max_num}.jsonl"
-    train_output = f"/openseg_blob/zhaoyaqi/flow_grpo/dataset/counting/train_metadata_{min_num}_{max_num}.jsonl"
-    test_output = f"/openseg_blob/zhaoyaqi/flow_grpo/dataset/counting/test_metadata_{min_num}_{max_num}.jsonl"
+    train_output = f"/openseg_blob/zhaoyaqi/flow_grpo/dataset/counting/train_metadata.jsonl"
+    test_output = f"/openseg_blob/zhaoyaqi/flow_grpo/dataset/counting/test_metadata.jsonl"
     
     # 创建输出目录
     Path(train_output).parent.mkdir(parents=True, exist_ok=True)
