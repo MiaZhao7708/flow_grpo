@@ -114,21 +114,29 @@ def eval(pipeline, test_dataloader, text_encoders, tokenizers, args, device):
         latents = latent.unsqueeze(0).repeat(args.num_images_per_prompt, 1, 1, 1)
         latents_sde = latents[0].unsqueeze(0)
         # ode sample
-        with torch.no_grad():
-            samples = pipeline(
-                prompts,
-                height=args.resolution,
-                width=args.resolution,
-                num_inference_steps=args.eval_num_steps,
-                guidance_scale=args.guidance_scale,
-                num_images_per_prompt=args.num_images_per_prompt,
-                negative_prompt="",
-                latents=latents,
-            ).images
+        output_ode_prefix = f"sample_{index_sample:02d}_image"
+        if any(filename.startswith(output_ode_prefix) and filename.endswith("_ode.png") for filename in os.listdir(args.output_dir)):
+            print(f"sample {index_sample} ode images already exist")
+            ode_flag = True
+        else:
+            ode_flag = False
+        
+        if not ode_flag:        
+            with torch.no_grad():
+                samples = pipeline(
+                    prompts,
+                    height=args.resolution,
+                    width=args.resolution,
+                    num_inference_steps=args.eval_num_steps,
+                    guidance_scale=args.guidance_scale,
+                    num_images_per_prompt=args.num_images_per_prompt,
+                    negative_prompt="",
+                    latents=latents,
+                ).images
 
-        for index_ode,sample in enumerate(samples):
-            output_path_ode = os.path.join(args.output_dir, f"sample_{index_sample:02d}_image_{index_ode:02d}_ode.png")
-            sample.save(output_path_ode)
+            for index_ode,sample in enumerate(samples):
+                output_path_ode = os.path.join(args.output_dir, f"sample_{index_sample:02d}_image_{index_ode:02d}_ode.png")
+                sample.save(output_path_ode)
 
         # sde sample
         for index_sde in tqdm(range(args.num_images_per_prompt), desc="SDE sample"):
