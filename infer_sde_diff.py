@@ -109,7 +109,8 @@ def eval(pipeline, test_dataloader, text_encoders, tokenizers, args, device):
             device=device
         )
         # shape = (16,64,64)
-        latent = torch.load("/openseg_blob/zhaoyaqi/flow_grpo/latent.pt").to(device)
+        latent = torch.randn(16,64,64).to(device)
+        # latent = torch.load("/openseg_blob/zhaoyaqi/flow_grpo/latent.pt").to(device)
         latents = latent.unsqueeze(0).repeat(args.num_images_per_prompt, 1, 1, 1)
         latents_sde = latents[0].unsqueeze(0)
         # ode sample

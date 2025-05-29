@@ -12,8 +12,9 @@
             background-color: #f5f5f5;
         }
         .container {
-            max-width: 95%;
+            max-width: 1800px;
             margin: 0 auto;
+            padding: 0 20px;
         }
         .prompt-section {
             background: white;
@@ -70,14 +71,16 @@
             background: rgba(255,255,255,0.7);
             padding: 15px;
             border-radius: 6px;
+            max-width: 1500px;
+            margin: 0 auto;
         }
         .image-container {
             position: relative;
             width: 100%;
-            padding-top: 56.25%;
+            padding-top: 100%;
             background: white;
             border-radius: 6px;
-            overflow: hidden;
+            overflow: visible;
             box-shadow: 0 2px 4px rgba(0,0,0,0.1);
         }
         .image-container img {
@@ -88,12 +91,14 @@
             height: 100%;
             object-fit: contain;
             border-radius: 4px;
-            transition: transform 0.2s ease;
+            transition: all 0.3s ease;
         }
         .image-container img:hover {
-            transform: scale(1.02);
-            box-shadow: 0 4px 8px rgba(0,0,0,0.1);
-            z-index: 1;
+            transform: scale(2.5);
+            box-shadow: 0 4px 8px rgba(0,0,0,0.2);
+            z-index: 100;
+            background: white;
+            cursor: zoom-in;
         }
         .image-container img.error {
             background-color: #f8d7da;
