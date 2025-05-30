@@ -496,7 +496,7 @@ def eval(pipeline, test_dataloader, text_encoders, tokenizers, config, accelerat
         #         step=global_step,
         #     )
         # 创建保存目录
-        eval_save_dir = "/openseg_blob/zhaoyaqi/workspace/coco80_grpo_counting_sd3_5_medium/eval_step_during_training"
+        eval_save_dir = config.save_dir.replace('output','eval_step_during_training' )
         step_save_dir = os.path.join(eval_save_dir, f"step_{global_step}")
         os.makedirs(step_save_dir, exist_ok=True)
 
