@@ -322,7 +322,7 @@ def eval(pipeline, test_dataloader, text_encoders, tokenizers, config, accelerat
     last_batch_prompt_ids_gather = accelerator.gather(last_batch_prompt_ids).cpu().numpy()
     last_batch_prompts_gather = pipeline.tokenizer.batch_decode(
         last_batch_prompt_ids_gather, skip_special_tokens=True
-    )
+    ) # decode the prompt ids to prompts
     last_batch_rewards_gather = {}
     for key, value in rewards.items():
         last_batch_rewards_gather[key] = accelerator.gather(torch.as_tensor(value, device=accelerator.device)).cpu().numpy()
