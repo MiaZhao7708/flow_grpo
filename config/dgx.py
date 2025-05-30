@@ -311,7 +311,7 @@ def geneval_sd3_counting_15_step20():
     # config.save_dir = '/openseg_blob/zhaoyaqi/workspace/flow_grpo/logs/counting_coco80_15_step20_guidance_7/sd3.5-M'
     config.save_dir = '/openseg_blob/zhaoyaqi/workspace/coco80_grpo_counting_sd3_5_medium/output/counting_coco80_15_step20_guidance_7'
     config.reward_fn = {
-        "geneval": 1.0,
+        "geneval_debug": 1.0,
         # "imagereward": 1.0,
         # "unifiedreward": 0.7,
     }
