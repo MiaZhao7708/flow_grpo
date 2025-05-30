@@ -84,7 +84,6 @@ def parse_args():
     )
     parser.add_argument(
         "--lora_step",
-        type=int,
         default=None,
         help="path to lora file",
     )
@@ -142,18 +141,18 @@ def main(opt):
         model = StableDiffusionPipeline.from_pretrained(opt.model, torch_dtype=torch.float16)
     device = torch.device("cuda") if torch.cuda.is_available() else torch.device("cpu")
     model = model.to(device)
-    if opt.lora_step:
-        # lora_path = f'/openseg_blob/zhaoyaqi/workspace/flow_grpo/logs/geneval/sd3.5-M/checkpoints/checkpoint-{opt.lora_step}/lora'
-        lora_path = f'/openseg_blob/zhaoyaqi/workspace/flow_grpo/logs/{opt.outdir}/sd3.5-M/checkpoints/checkpoint-{opt.lora_step}/lora'
-        print(f'---------- Using LoRA model: {lora_path} ----------')
-        import pdb; pdb.set_trace()
-        model.transformer = PeftModel.from_pretrained(model.transformer, lora_path)
-        model.transformer = model.transformer.merge_and_unload()
-        opt.outdir = f"{opt.outdir}-step{opt.lora_step}"
-    
     # if opt.lora_step:
-    #     print(f'---------- Using LoRA model: {opt.lora_step} ----------')
-    #     model.load_lora_weights(opt.lora_step)
+    #     # lora_path = f'/openseg_blob/zhaoyaqi/workspace/flow_grpo/logs/geneval/sd3.5-M/checkpoints/checkpoint-{opt.lora_step}/lora'
+    #     lora_path = f'/openseg_blob/zhaoyaqi/workspace/flow_grpo/logs/{opt.outdir}/sd3.5-M/checkpoints/checkpoint-{opt.lora_step}/lora'
+    #     print(f'---------- Using LoRA model: {lora_path} ----------')
+    #     import pdb; pdb.set_trace()
+    #     model.transformer = PeftModel.from_pretrained(model.transformer, lora_path)
+    #     model.transformer = model.transformer.merge_and_unload()
+    #     opt.outdir = f"{opt.outdir}-step{opt.lora_step}"
+    
+    if opt.lora_step:
+        print(f'---------- Using LoRA model: {opt.lora_step} ----------')
+        model.load_lora_weights(opt.lora_step)
     
     
     # base_outdir = "/openseg_blob/zhaoyaqi/workspace/flow_grpo/coco_counting/output_eval"
