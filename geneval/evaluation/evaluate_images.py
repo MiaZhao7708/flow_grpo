@@ -261,8 +261,10 @@ def evaluate_image(filepath, metadata):
 
 def main(args):
     full_results = []
-    base_outdir_img = "/openseg_blob/zhaoyaqi/workspace/flow_grpo/geneval/output_eval"
-    base_outdir_summary = "/openseg_blob/zhaoyaqi/workspace/flow_grpo/geneval/summary_scores"
+    # base_outdir_img = "/openseg_blob/zhaoyaqi/workspace/flow_grpo/geneval/output_eval"
+    base_outdir_img = '/openseg_blob/zhaoyaqi/workspace/coco80_grpo_counting_sd3_5_medium/output_eval'
+    # base_outdir_summary = "/openseg_blob/zhaoyaqi/workspace/flow_grpo/geneval/summary_scores"
+    base_outdir_summary = '/openseg_blob/zhaoyaqi/workspace/coco80_grpo_counting_sd3_5_medium/summary_scores'
     args.imagedir = os.path.join(base_outdir_img, args.imagedir)
     for subfolder in tqdm(os.listdir(args.imagedir),desc="Evaluating images"):
         folderpath = os.path.join(args.imagedir, subfolder)
@@ -279,18 +281,19 @@ def main(args):
             full_results.append(result)
     # Save results
     args.outfile = os.path.join(base_outdir_summary, args.imagedir, args.outfile)
+    # print(f"---------- Output directory: {args.outfile} ----------")
     if os.path.dirname(args.outfile):
         os.makedirs(os.path.dirname(args.outfile), exist_ok=True)
     with open(args.outfile, "w") as fp:
         pd.DataFrame(full_results).to_json(fp, orient="records", lines=True)
-
+    print(f"---------- Output file: {args.outfile} ----------")
 
 if __name__ == "__main__":
     args = parse_args()
     object_detector, (clip_model, transform, tokenizer), classnames = load_models(args)
     THRESHOLD = float(args.options.get('threshold', 0.3))
     COUNTING_THRESHOLD = float(args.options.get('counting_threshold', 0.9))
-    MAX_OBJECTS = int(args.options.get('max_objects', 16))
+    MAX_OBJECTS = int(args.options.get('max_objects', 50))
     NMS_THRESHOLD = float(args.options.get('max_overlap', 1.0))
     POSITION_THRESHOLD = float(args.options.get('position_threshold', 0.1))
 
