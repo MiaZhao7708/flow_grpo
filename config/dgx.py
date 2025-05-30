@@ -122,7 +122,6 @@ def geneval_sd3():
     return config
 
 
-
 def geneval_sd3_counting_5_step20():
     config = compressibility()
     config.dataset = os.path.join(os.getcwd(), "dataset/counting_5")
@@ -172,7 +171,7 @@ def geneval_sd3_counting_5_step20():
     config.per_prompt_stat_tracking = True
     return config
 
-def geneval_sd3_counting_step20():
+def geneval_sd3_counting_10_step20():
     config = compressibility()
     config.dataset = os.path.join(os.getcwd(), "dataset/counting")
 

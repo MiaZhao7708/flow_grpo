@@ -4,7 +4,6 @@
     "containerName": "zyq_grpo",
     "runArgs": [
         "--gpus=all",
-        "--runtime=nvidia"
     ],
     "mounts": [
         "source=/home/zyq/openseg_blob,target=/openseg_blob,type=bind",

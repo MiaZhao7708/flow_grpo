@@ -258,6 +258,144 @@ def compute_log_prob(transformer, pipeline, sample, j, embeds, pooled_embeds, co
 
     return prev_sample, log_prob, prev_sample_mean, std_dev_t
 
+# def eval(pipeline, test_dataloader, text_encoders, tokenizers, config, accelerator, global_step, reward_fn, executor, autocast, num_train_timesteps, ema, transformer_trainable_parameters):
+#     if config.train.ema:
+#         ema.copy_ema_to(transformer_trainable_parameters, store_temp=True)
+#     neg_prompt_embed, neg_pooled_prompt_embed = compute_text_embeddings([""], text_encoders, tokenizers, max_sequence_length=128, device=accelerator.device)
+
+#     sample_neg_prompt_embeds = neg_prompt_embed.repeat(config.sample.test_batch_size, 1, 1)
+#     sample_neg_pooled_prompt_embeds = neg_pooled_prompt_embed.repeat(config.sample.test_batch_size, 1)
+
+#     # 创建保存目录
+#     eval_save_dir = "/openseg_blob/zhaoyaqi/workspace/coco80_grpo_counting_sd3_5_medium/eval_step_during_training"
+#     step_save_dir = os.path.join(eval_save_dir, f"step_{global_step}")
+#     if accelerator.is_main_process:
+#         os.makedirs(step_save_dir, exist_ok=True)
+
+#     # test_dataloader = itertools.islice(test_dataloader, 2)
+#     all_rewards = defaultdict(list)
+#     all_images = []
+#     all_prompts = []
+#     all_prompt_metadata = []
+#     for test_batch in tqdm(
+#             test_dataloader,
+#             desc="Eval: ",
+#             disable=not accelerator.is_local_main_process,
+#             position=0,
+#         ):
+#         prompts, prompt_metadata = test_batch
+#         prompt_embeds, pooled_prompt_embeds = compute_text_embeddings(
+#             prompts, 
+#             text_encoders, 
+#             tokenizers, 
+#             max_sequence_length=128, 
+#             device=accelerator.device
+#         )
+#         # 最后一个batch可能不够batch_size
+#         if len(prompt_embeds)<len(sample_neg_prompt_embeds):
+#             sample_neg_prompt_embeds = sample_neg_prompt_embeds[:len(prompt_embeds)]
+#             sample_neg_pooled_prompt_embeds = sample_neg_pooled_prompt_embeds[:len(prompt_embeds)]
+#         with autocast():
+#             with torch.no_grad():
+#                 images, latents, log_probs, _ = pipeline_with_logprob(
+#                     pipeline,
+#                     prompt_embeds=prompt_embeds,
+#                     pooled_prompt_embeds=pooled_prompt_embeds,
+#                     negative_prompt_embeds=sample_neg_prompt_embeds,
+#                     negative_pooled_prompt_embeds=sample_neg_pooled_prompt_embeds,
+#                     num_inference_steps=config.sample.eval_num_steps,
+#                     guidance_scale=config.sample.guidance_scale,
+#                     output_type="pt",
+#                     return_dict=False,
+#                     height=config.resolution,
+#                     width=config.resolution, 
+#                     determistic=True,
+#                 )
+#         rewards = executor.submit(reward_fn, images, prompts, prompt_metadata, only_strict=False)
+#         # yield to to make sure reward computation starts
+#         time.sleep(0)
+#         rewards, reward_metadata = rewards.result()
+
+#         # 收集所有图片和提示词
+#         all_images.extend(images.cpu())
+#         all_prompts.extend(prompts)
+#         all_prompt_metadata.extend(prompt_metadata)
+
+#         for key, value in rewards.items():
+#             rewards_gather = accelerator.gather(torch.as_tensor(value, device=accelerator.device)).cpu().numpy()
+#             all_rewards[key].append(rewards_gather)
+    
+#     # 收集所有进程的数据
+#     all_images_gather = accelerator.gather(torch.stack(all_images)).cpu().numpy()
+#     all_prompt_ids = tokenizers[0](
+#         all_prompts,
+#         padding="max_length",
+#         max_length=77,
+#         truncation=True,
+#         return_tensors="pt",
+#     ).input_ids.to(accelerator.device)
+#     all_prompt_ids_gather = accelerator.gather(all_prompt_ids).cpu().numpy()
+#     all_prompts_gather = pipeline.tokenizer.batch_decode(
+#         all_prompt_ids_gather, skip_special_tokens=True
+#     )
+#     all_rewards = {key: np.concatenate(value) for key, value in all_rewards.items()}
+
+#     if accelerator.is_main_process:
+#         # 保存所有图片
+#         for idx, (image, prompt) in enumerate(zip(all_images_gather, all_prompts_gather)):
+#             pil = Image.fromarray(
+#                 (image.transpose(1, 2, 0) * 255).astype(np.uint8)
+#             )
+#             pil = pil.resize((config.resolution, config.resolution))
+#             # 保存图片
+#             pil.save(os.path.join(step_save_dir, f"{idx}.jpg"))
+        
+#         # 保存提示词和评估指标
+#         results = {
+#             "prompts": all_prompts_gather,
+#             "rewards": {k: v.tolist() for k, v in all_rewards.items()},
+#             "prompt_metadata": all_prompt_metadata,
+#             "metrics": {
+#                 f"eval_reward_{key}": float(np.mean(value[value != -10])) 
+#                 for key, value in all_rewards.items()
+#             }
+#         }
+        
+#         # 保存结果到JSON文件
+#         with open(os.path.join(step_save_dir, "eval_results.json"), "w") as f:
+#             json.dump(results, f, indent=2)
+
+#         # 记录到wandb
+#         with tempfile.TemporaryDirectory() as tmpdir:
+#             num_samples = min(15, len(all_images_gather))
+#             sample_indices = range(num_samples)
+#             for idx, index in enumerate(sample_indices):
+#                 image = all_images_gather[index]
+#                 pil = Image.fromarray(
+#                     (image.transpose(1, 2, 0) * 255).astype(np.uint8)
+#                 )
+#                 pil = pil.resize((config.resolution, config.resolution))
+#                 pil.save(os.path.join(tmpdir, f"{idx}.jpg"))
+#             sampled_prompts = [all_prompts_gather[index] for index in sample_indices]
+#             sampled_rewards = [{k: all_rewards[k][index] for k in all_rewards} for index in sample_indices]
+#             for key, value in all_rewards.items():
+#                 print(key, value.shape)
+#             accelerator.log(
+#                 {
+#                     "eval_images": [
+#                         wandb.Image(
+#                             os.path.join(tmpdir, f"{idx}.jpg"),
+#                             caption=f"{prompt:.1000} | " + " | ".join(f"{k}: {v:.2f}" for k, v in reward.items() if v != -10),
+#                         )
+#                         for idx, (prompt, reward) in enumerate(zip(sampled_prompts, sampled_rewards))
+#                     ],
+#                     **{f"eval_reward_{key}": np.mean(value[value != -10]) for key, value in all_rewards.items()},
+#                 },
+#                 step=global_step,
+#             )
+#     if config.train.ema:
+#         ema.copy_temp_to(transformer_trainable_parameters)
+
 def eval(pipeline, test_dataloader, text_encoders, tokenizers, config, accelerator, global_step, reward_fn, executor, autocast, num_train_timesteps, ema, transformer_trainable_parameters):
     if config.train.ema:
         ema.copy_ema_to(transformer_trainable_parameters, store_temp=True)
@@ -329,34 +467,75 @@ def eval(pipeline, test_dataloader, text_encoders, tokenizers, config, accelerat
 
     all_rewards = {key: np.concatenate(value) for key, value in all_rewards.items()}
     if accelerator.is_main_process:
-        with tempfile.TemporaryDirectory() as tmpdir:
-            num_samples = min(15, len(last_batch_images_gather))
-            # sample_indices = random.sample(range(len(images)), num_samples)
-            sample_indices = range(num_samples)
-            for idx, index in enumerate(sample_indices):
-                image = last_batch_images_gather[index]
-                pil = Image.fromarray(
-                    (image.transpose(1, 2, 0) * 255).astype(np.uint8)
-                )
-                pil = pil.resize((config.resolution, config.resolution))
-                pil.save(os.path.join(tmpdir, f"{idx}.jpg"))  # 使用新的索引
-            sampled_prompts = [last_batch_prompts_gather[index] for index in sample_indices]
-            sampled_rewards = [{k: last_batch_rewards_gather[k][index] for k in last_batch_rewards_gather} for index in sample_indices]
-            for key, value in all_rewards.items():
-                print(key, value.shape)
-            accelerator.log(
-                {
-                    "eval_images": [
-                        wandb.Image(
-                            os.path.join(tmpdir, f"{idx}.jpg"),
-                            caption=f"{prompt:.1000} | " + " | ".join(f"{k}: {v:.2f}" for k, v in reward.items() if v != -10),
-                        )
-                        for idx, (prompt, reward) in enumerate(zip(sampled_prompts, sampled_rewards))
-                    ],
-                    **{f"eval_reward_{key}": np.mean(value[value != -10]) for key, value in all_rewards.items()},
-                },
-                step=global_step,
+        # with tempfile.TemporaryDirectory() as tmpdir:
+        #     num_samples = min(15, len(last_batch_images_gather))
+        #     # sample_indices = random.sample(range(len(images)), num_samples)
+        #     sample_indices = range(num_samples)
+        #     for idx, index in enumerate(sample_indices):
+        #         image = last_batch_images_gather[index]
+        #         pil = Image.fromarray(
+        #             (image.transpose(1, 2, 0) * 255).astype(np.uint8)
+        #         )
+        #         pil = pil.resize((config.resolution, config.resolution))
+        #         pil.save(os.path.join(tmpdir, f"{idx}.jpg"))  # 使用新的索引
+        #     sampled_prompts = [last_batch_prompts_gather[index] for index in sample_indices]
+        #     sampled_rewards = [{k: last_batch_rewards_gather[k][index] for k in last_batch_rewards_gather} for index in sample_indices]
+        #     for key, value in all_rewards.items():
+        #         print(key, value.shape)
+        #     accelerator.log(
+        #         {
+        #             "eval_images": [
+        #                 wandb.Image(
+        #                     os.path.join(tmpdir, f"{idx}.jpg"),
+        #                     caption=f"{prompt:.1000} | " + " | ".join(f"{k}: {v:.2f}" for k, v in reward.items() if v != -10),
+        #                 )
+        #                 for idx, (prompt, reward) in enumerate(zip(sampled_prompts, sampled_rewards))
+        #             ],
+        #             **{f"eval_reward_{key}": np.mean(value[value != -10]) for key, value in all_rewards.items()},
+        #         },
+        #         step=global_step,
+        #     )
+        # 创建保存目录
+        eval_save_dir = "/openseg_blob/zhaoyaqi/workspace/coco80_grpo_counting_sd3_5_medium/eval_step_during_training"
+        step_save_dir = os.path.join(eval_save_dir, f"step_{global_step}")
+        os.makedirs(step_save_dir, exist_ok=True)
+
+        # 保存最后一个batch的图片
+        num_samples = min(15, len(last_batch_images_gather))
+        sample_indices = range(num_samples)
+        for idx, index in enumerate(sample_indices):
+            image = last_batch_images_gather[index]
+            pil = Image.fromarray(
+                (image.transpose(1, 2, 0) * 255).astype(np.uint8)
             )
+            pil = pil.resize((config.resolution, config.resolution))
+            pil.save(os.path.join(step_save_dir, f"{idx}.jpg"))
+
+        # 保存评估指标
+        metrics = {
+            f"eval_reward_{key}": float(np.mean(value[value != -10])) 
+            for key, value in all_rewards.items()
+        }
+        with open(os.path.join(step_save_dir, "eval_results.json"), "w") as f:
+            json.dump(metrics, f, indent=2)
+
+        sampled_prompts = [last_batch_prompts_gather[index] for index in sample_indices]
+        sampled_rewards = [{k: last_batch_rewards_gather[k][index] for k in last_batch_rewards_gather} for index in sample_indices]
+        for key, value in all_rewards.items():
+            print(key, value.shape)
+        accelerator.log(
+            {
+                "eval_images": [
+                    wandb.Image(
+                        os.path.join(step_save_dir, f"{idx}.jpg"),
+                        caption=f"{prompt:.1000} | " + " | ".join(f"{k}: {v:.2f}" for k, v in reward.items() if v != -10),
+                    )
+                    for idx, (prompt, reward) in enumerate(zip(sampled_prompts, sampled_rewards))
+                ],
+                **{f"eval_reward_{key}": np.mean(value[value != -10]) for key, value in all_rewards.items()},
+            },
+            step=global_step,
+        )
     if config.train.ema:
         ema.copy_temp_to(transformer_trainable_parameters)
 
@@ -729,7 +908,8 @@ def main(_):
                 return_tensors="pt",
             ).input_ids.to(accelerator.device)
             
-            if i==0 and epoch % config.eval_freq == 0 and epoch>0:
+            # if i==0 and epoch % config.eval_freq == 0 and epoch>0:
+            if i==0 and epoch % config.eval_freq == 0:
                 # eval
                 eval(pipeline, test_dataloader, text_encoders, tokenizers, config, accelerator, global_step, eval_reward_fn, executor, autocast, num_train_timesteps, ema, transformer_trainable_parameters)
             

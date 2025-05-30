@@ -1,11 +1,9 @@
 import json
 import random
-from pathlib import Path
-
-# 读取object names
-def load_object_names(file_path):
-    with open(file_path, 'r') as f:
-        return [line.strip() for line in f.readlines()]
+import re
+import os
+import random
+from tqdm import tqdm
 
 def needs_an(word):
     """判断单词是否需要使用'an'作为不定冠词"""
@@ -92,59 +90,67 @@ prompt_list = [
     "A free-form presentation of {article} {object} scattered throughout the space on a soft gray background, each displaying realistic materials and precise details."
 ]
 
-def generate_metadata(object_names, output_file, samples_per_object=5):
-    metadata_list = []
-    
-    for animal in object_names:
-        # 获取正确的复数形式
-        animal_plural = get_plural_form(animal)
+def get_animal_from_id(image_id):
+    # 从图片ID中提取动物名称和数量
+    # 例如: "42great_white_shark_00064.png" -> ("great white shark", 42)
+    # 使用正则表达式匹配开头的数字
+    match = re.match(r'^(\d+)', image_id)
+    if match:
+        gt_count = int(match.group(1))
+    else:
+        gt_count = 0
         
-        for number in range(1, 11):
-            for prompt_template in prompt_list:
-                # 根据数量决定是否使用复数形式
-                object_form = get_plural_form(animal) if number > 1 else animal
-                # 获取正确的冠词或数量词
-                article = get_article(animal, number)
-                
-                prompt = prompt_template.format(
-                    article=article,
-                    object=object_form
-                )
-                
-                metadata = {
-                    "tag": "counting",
-                    "include": [{"class": animal, "count": number}],
-                    "exclude": [{"class": animal, "count": number + 1}],
-                    "prompt": prompt,
-                    "class": animal
-                }
-            
-                metadata_list.append(metadata)
-    import pdb; pdb.set_trace()
-    # with open(output_file, 'w') as f:
-    #     for metadata in metadata_list:
-    #         f.write(json.dumps(metadata) + "\\n")
-
-    with open(output_file, "w") as f:
-        for metadata in metadata_list:
-            json_line = json.dumps(metadata, ensure_ascii=False)
-            f.write(json_line + "\n")
-
-def main():
-    # 设置路径
-    object_names_path = "/openseg_blob/zhaoyaqi/flow_grpo/reward-server/reward_server/object_names.txt"
-    output_path = "/openseg_blob/zhaoyaqi/flow_grpo/dataset/counting/metadata_1_10.jsonl"
+    # 提取动物名称
+    animal_name = re.sub(r'^\d+', '', image_id)
+    parts = animal_name.split('_')[:-1]
+    animal_name = ' '.join(parts)
     
-    # 确保输出目录存在
-    Path(output_path).parent.mkdir(parents=True, exist_ok=True)
-    
-    # 读取object names
-    object_names = load_object_names(object_names_path)
-    
-    # 生成metadata
-    generate_metadata(object_names, output_path)
-    print(f"Generated metadata saved to {output_path}")
+    return animal_name.lower(), gt_count
 
-if __name__ == "__main__":
-    main()
+def get_animal_from_id_count20(image_id):
+    # 从图片ID中提取动物名称
+    # 例如: "42great_white_shark_00064.png" -> "great white shark"
+    animal_name = image_id.split('_20')[0]
+    animal_name = animal_name.replace('_', ' ')
+    return animal_name.lower()
 
+# image_folder = '/openseg_blob/zhaoyaqi/Count-FLUX/playground/results/one_animal_random_layout_250animals_50number_40layout_512px_500k'
+image_folder = '/openseg_blob/zhaoyaqi/Count-FLUX/playground/results/one_object_random_layout_coco79_grpo_512px_8k_refine_v2'
+animals = os.listdir(image_folder)
+animals = [animal for animal in animals if animal.endswith('.png')]
+output_path = "/openseg_blob/zhaoyaqi/Count-FLUX/playground/data/one_object_random_layout_coco79_grpo_512px_8k_refine_v4_data.json"
+animal_names = []
+data = []
+for animal in tqdm(animals):
+    # image_path = os.path.join(image_folder, animal)
+    animal_name, gt_count = get_animal_from_id(animal)
+    # 根据数量决定是否使用复数形式
+    object_form = get_plural_form(animal_name) if gt_count > 1 else animal_name
+    # 获取正确的冠词或数量词
+    article = get_article(animal_name, gt_count)
+    
+    if object_form not in animal_names:
+        animal_names.append(object_form)
+    
+    prompt = random.choice(prompt_list).format(
+        article=article,
+        object=object_form
+    )
+    
+    item = {
+        "id": animal,
+        "caption": prompt,
+        "animal": animal_name,
+        "label": gt_count-1
+    }
+    data.append(item)
+
+count_dict = {}
+for item in data:
+    if item['label'] not in count_dict:
+        count_dict[item['label']] = 0
+    count_dict[item['label']] += 1
+
+import pdb; pdb.set_trace()
+with open(output_path, 'w') as f:
+    json.dump(data, f, indent=4)
