@@ -309,7 +309,7 @@ def geneval_sd3_counting_15_step20():
     config.save_freq = 10 # epoch
     config.eval_freq = 20
     # config.save_dir = '/openseg_blob/zhaoyaqi/workspace/flow_grpo/logs/counting_coco80_15_step20_guidance_7/sd3.5-M'
-    config.save_dir = '/openseg_blob/zhaoyaqi/workspace/coco80_grpo_counting_sd3_5_medium/output/counting_coco80_15_step20_guidance_7'
+    config.save_dir = '/openseg_blob/zhaoyaqi/workspace/coco80_grpo_counting_sd3_5_medium/output/counting_coco80_15_step20_guidance_7_v5'
     config.reward_fn = {
         "geneval_debug": 1.0,
         # "imagereward": 1.0,
