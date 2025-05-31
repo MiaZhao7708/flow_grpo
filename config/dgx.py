@@ -128,7 +128,7 @@ def geneval_sd3_counting_5_step20():
 
     # sd3.5 medium
     config.pretrained.model = "stabilityai/stable-diffusion-3.5-medium"
-    config.merge_lora_path = '/openseg_blob/zhaoyaqi/workspace/coco80_grpo_counting_sd3_5_medium/output/sd_3_5_medium_base_data_8k_coco80/checkpoint-1000'
+    config.merge_lora_path = '/openseg_blob/zhaoyaqi/workspace/coco80_grpo_counting_sd3_5_medium/output/sd_3_5_medium_base_data_8k_coco80_v5/checkpoint-1000'
     config.sample.num_steps = 20 # 40
     config.sample.eval_num_steps = 40
     # config.sample.guidance_scale = 4.5
@@ -159,7 +159,7 @@ def geneval_sd3_counting_5_step20():
     config.save_freq = 10 # epoch
     config.eval_freq = 20
     # config.save_dir = '/openseg_blob/zhaoyaqi/workspace/flow_grpo/logs/counting_coco80_5_step10_guidance_7/sd3.5-M'
-    config.save_dir = '/openseg_blob/zhaoyaqi/workspace/coco80_grpo_counting_sd3_5_medium/output/counting_coco80_5_step20_guidance_7'
+    config.save_dir = '/openseg_blob/zhaoyaqi/workspace/coco80_grpo_counting_sd3_5_medium/output/counting_coco80_5_step20_guidance_7_v5'
     config.reward_fn = {
         "geneval": 1.0,
         # "imagereward": 1.0,
@@ -177,7 +177,7 @@ def geneval_sd3_counting_10_step20():
 
     # sd3.5 medium
     config.pretrained.model = "stabilityai/stable-diffusion-3.5-medium"
-    config.merge_lora_path = '/openseg_blob/zhaoyaqi/workspace/coco80_grpo_counting_sd3_5_medium/output/sd_3_5_medium_base_data_8k_coco80/checkpoint-1000'
+    config.merge_lora_path = '/openseg_blob/zhaoyaqi/workspace/coco80_grpo_counting_sd3_5_medium/output/sd_3_5_medium_base_data_8k_coco80_v5/checkpoint-1000'
     config.sample.num_steps = 20 # 40
     config.sample.eval_num_steps = 40
     # config.sample.guidance_scale = 4.5
@@ -208,7 +208,7 @@ def geneval_sd3_counting_10_step20():
     config.save_freq = 10 # epoch
     config.eval_freq = 20
     # config.save_dir = '/openseg_blob/zhaoyaqi/workspace/flow_grpo/logs/counting_coco80_10_step20_guidance_7/sd3.5-M'
-    config.save_dir = '/openseg_blob/zhaoyaqi/workspace/coco80_grpo_counting_sd3_5_medium/output/counting_coco80_10_step20_guidance_7'
+    config.save_dir = '/openseg_blob/zhaoyaqi/workspace/coco80_grpo_counting_sd3_5_medium/output/counting_coco80_10_step20_guidance_7_v5'
     config.reward_fn = {
         "geneval_step20": 1.0,
         # "imagereward": 1.0,
@@ -228,7 +228,7 @@ def geneval_sd3_counting_20_step20():
 
     # sd3.5 medium
     config.pretrained.model = "stabilityai/stable-diffusion-3.5-medium"
-    config.merge_lora_path = '/openseg_blob/zhaoyaqi/workspace/coco80_grpo_counting_sd3_5_medium/output/sd_3_5_medium_base_data_8k_coco80/checkpoint-1000'
+    config.merge_lora_path = '/openseg_blob/zhaoyaqi/workspace/coco80_grpo_counting_sd3_5_medium/output/sd_3_5_medium_base_data_8k_coco80_v5/checkpoint-1000'
     config.sample.num_steps = 20 # 40
     config.sample.eval_num_steps = 40
     # config.sample.guidance_scale = 4.5
@@ -259,7 +259,7 @@ def geneval_sd3_counting_20_step20():
     config.save_freq = 10 # epoch
     config.eval_freq = 20
     # config.save_dir = '/openseg_blob/zhaoyaqi/workspace/flow_grpo/logs/counting_coco80_10_step10_guidance_7/sd3.5-M'
-    config.save_dir = '/openseg_blob/zhaoyaqi/workspace/coco80_grpo_counting_sd3_5_medium/output/counting_coco80_20_step20_guidance_7'
+    config.save_dir = '/openseg_blob/zhaoyaqi/workspace/coco80_grpo_counting_sd3_5_medium/output/counting_coco80_20_step20_guidance_7_v5'
     config.reward_fn = {
         "geneval_debug": 1.0,
         # "imagereward": 1.0,
@@ -278,7 +278,7 @@ def geneval_sd3_counting_15_step20():
 
     # sd3.5 medium
     config.pretrained.model = "stabilityai/stable-diffusion-3.5-medium"
-    config.merge_lora_path = '/openseg_blob/zhaoyaqi/workspace/coco80_grpo_counting_sd3_5_medium/output/sd_3_5_medium_base_data_8k_coco80/checkpoint-1000'
+    config.merge_lora_path = '/openseg_blob/zhaoyaqi/workspace/coco80_grpo_counting_sd3_5_medium/output/sd_3_5_medium_base_data_8k_coco80_v5/checkpoint-1000'
     config.sample.num_steps = 20 # 40
     config.sample.eval_num_steps = 40
     # config.sample.guidance_scale = 4.5

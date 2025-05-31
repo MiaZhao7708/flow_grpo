@@ -92,25 +92,36 @@ prompt_list = [
     "A free-form presentation of {article} {object} scattered throughout the space on a soft gray background, each displaying realistic materials and precise details."
 ]
 
-def generate_metadata(object_names, output_file, samples_per_object=5):
+prompt_list_single = [
+    "A striking {object} positioned centrally on a neutral gray background, highlighting its distinctive shape and form.",
+    "A clear view of {article} {object} set against a soft gray backdrop, emphasizing its natural proportions.",
+    "An elegant composition featuring {article} {object} placed thoughtfully on a neutral gray canvas.",
+    "A minimalist presentation of {article} {object} against a clean gray background, capturing its essential characteristics.",
+    "A refined portrayal of {article} {object} set on a subtle gray backdrop, showcasing its unique silhouette.",
+    "A focused study of {article} {object} positioned deliberately on a neutral gray surface.",
+    "A simple yet effective arrangement showing {article} {object} against a muted gray background.",
+    "A carefully composed image of {article} {object} placed on a neutral gray canvas.",
+    "A straightforward depiction of {article} {object} set against an understated gray backdrop.",
+    "A clean representation of {article} {object} positioned on a neutral gray surface."
+]
+def generate_metadata(object_names, output_file, max_num):
     metadata_list = []
     
     for animal in object_names:
         # 获取正确的复数形式
-        animal_plural = get_plural_form(animal)
-        
-        for number in range(1, 11):
-            for prompt_template in prompt_list:
+        for number in range(1, max_num + 1):
+            for index in range(len(prompt_list)):
                 # 根据数量决定是否使用复数形式
                 object_form = get_plural_form(animal) if number > 1 else animal
                 # 获取正确的冠词或数量词
                 article = get_article(animal, number)
                 
-                prompt = prompt_template.format(
+                selected_prompt_list = prompt_list if number > 1 else prompt_list_single
+                
+                prompt = selected_prompt_list[index].format(
                     article=article,
                     object=object_form
                 )
-                
                 metadata = {
                     "tag": "counting",
                     "include": [{"class": animal, "count": number}],
@@ -132,8 +143,9 @@ def generate_metadata(object_names, output_file, samples_per_object=5):
 
 def main():
     # 设置路径
+    max_num = 15
     object_names_path = "/openseg_blob/zhaoyaqi/flow_grpo/reward-server/reward_server/object_names.txt"
-    output_path = "/openseg_blob/zhaoyaqi/flow_grpo/dataset/counting/metadata_1_10.jsonl"
+    output_path = f"/openseg_blob/zhaoyaqi/flow_grpo/dataset/counting_15/metadata_1_{max_num}.jsonl"
     
     # 确保输出目录存在
     Path(output_path).parent.mkdir(parents=True, exist_ok=True)
@@ -142,7 +154,7 @@ def main():
     object_names = load_object_names(object_names_path)
     
     # 生成metadata
-    generate_metadata(object_names, output_path)
+    generate_metadata(object_names, output_path, max_num)
     print(f"Generated metadata saved to {output_path}")
 
 if __name__ == "__main__":
