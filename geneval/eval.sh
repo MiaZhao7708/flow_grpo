@@ -29,21 +29,28 @@ trap cleanup SIGINT
 # CUDA_VISIBLE_DEVICES=3 python generation/diffusers_generate.py --lora_step '/openseg_blob/zhaoyaqi/workspace/coco80_grpo_counting_sd3_5_medium/output/sd_3_5_medium_base_data_8k_coco80/checkpoint-1000' --outdir "sd-3.5-m-base-coco80-8k-step20" --steps 20 --n_samples 4 --metadata_file "/openseg_blob/zhaoyaqi/flow_grpo/dataset/counting/test_metadata.jsonl" &
 
 
-# CUDA_VISIBLE_DEVICES=0 python generation/diffusers_generate.py --lora_step '/openseg_blob/zhaoyaqi/workspace/coco80_grpo_counting_sd3_5_medium/output/sd_3_5_medium_base_data_8k_coco80/checkpoint-1000' --outdir "sd-3.5-m-base-coco80-8k" --n_samples 4 &
-# CUDA_VISIBLE_DEVICES=1 python generation/diffusers_generate.py --lora_step '/openseg_blob/zhaoyaqi/workspace/coco80_grpo_counting_sd3_5_medium/output/sd_3_5_medium_base_data_8k_coco80/checkpoint-1000' --outdir "sd-3.5-m-base-coco80-8k" --n_samples 4 &
-# CUDA_VISIBLE_DEVICES=2 python generation/diffusers_generate.py --lora_step '/openseg_blob/zhaoyaqi/workspace/coco80_grpo_counting_sd3_5_medium/output/sd_3_5_medium_base_data_8k_coco80/checkpoint-1000' --outdir "sd-3.5-m-base-coco80-8k" --n_samples 4 &
-# CUDA_VISIBLE_DEVICES=3 python generation/diffusers_generate.py --lora_step '/openseg_blob/zhaoyaqi/workspace/coco80_grpo_counting_sd3_5_medium/output/sd_3_5_medium_base_data_8k_coco80/checkpoint-1000' --outdir "sd-3.5-m-base-coco80-8k" --n_samples 4 &
+CUDA_VISIBLE_DEVICES=0 python generation/diffusers_generate.py --lora_step '/openseg_blob/zhaoyaqi/workspace/coco80_grpo_counting_sd3_5_medium/output/sd_3_5_medium_base_data_8k_coco80/checkpoint-3000' --outdir "sd-3.5-m-base-coco80-8k-ft-step3k" --n_samples 4 &
+CUDA_VISIBLE_DEVICES=1 python generation/diffusers_generate.py --lora_step '/openseg_blob/zhaoyaqi/workspace/coco80_grpo_counting_sd3_5_medium/output/sd_3_5_medium_base_data_8k_coco80/checkpoint-3000' --outdir "sd-3.5-m-base-coco80-8k-ft-step3k" --n_samples 4 &
+CUDA_VISIBLE_DEVICES=2 python generation/diffusers_generate.py --lora_step '/openseg_blob/zhaoyaqi/workspace/coco80_grpo_counting_sd3_5_medium/output/sd_3_5_medium_base_data_8k_coco80/checkpoint-5000' --outdir "sd-3.5-m-base-coco80-8k-ft-step5k" --n_samples 4 &
+CUDA_VISIBLE_DEVICES=3 python generation/diffusers_generate.py --lora_step '/openseg_blob/zhaoyaqi/workspace/coco80_grpo_counting_sd3_5_medium/output/sd_3_5_medium_base_data_8k_coco80/checkpoint-5000' --outdir "sd-3.5-m-base-coco80-8k-ft-step5k" --n_samples 4 &
 
-CUDA_VISIBLE_DEVICES=0 python generation/diffusers_generate.py --outdir "sd-3.5-m-base" --n_samples 4 &
-CUDA_VISIBLE_DEVICES=1 python generation/diffusers_generate.py --outdir "sd-3.5-m-base" --n_samples 4 &
-CUDA_VISIBLE_DEVICES=2 python generation/diffusers_generate.py --outdir "sd-3.5-m-base" --n_samples 4 &
-CUDA_VISIBLE_DEVICES=3 python generation/diffusers_generate.py --outdir "sd-3.5-m-base" --n_samples 4 &
+# CUDA_VISIBLE_DEVICES=0 python generation/diffusers_generate.py --outdir "sd-3.5-m-base" --n_samples 4 &
+# CUDA_VISIBLE_DEVICES=1 python generation/diffusers_generate.py --outdir "sd-3.5-m-base" --n_samples 4 &
+# CUDA_VISIBLE_DEVICES=2 python generation/diffusers_generate.py --outdir "sd-3.5-m-base" --n_samples 4 &
+# CUDA_VISIBLE_DEVICES=3 python generation/diffusers_generate.py --outdir "sd-3.5-m-base" --n_samples 4 &
 
 # CUDA_VISIBLE_DEVICES=0 python generation/diffusers_generate.py --lora_step 316 --outdir "counting_coco80_10_step20_guidance_7" --metadata_file "/openseg_blob/zhaoyaqi/flow_grpo/dataset/counting/test_metadata.jsonl" &
 # CUDA_VISIBLE_DEVICES=1 python generation/diffusers_generate.py --lora_step 316 --outdir "counting_coco80_10_step20_guidance_7" --metadata_file "/openseg_blob/zhaoyaqi/flow_grpo/dataset/counting/test_metadata.jsonl" &
 # CUDA_VISIBLE_DEVICES=2 python generation/diffusers_generate.py --lora_step 316 --outdir "counting_coco80_10_step20_guidance_7" --metadata_file "/openseg_blob/zhaoyaqi/flow_grpo/dataset/counting/test_metadata.jsonl" &
 # CUDA_VISIBLE_DEVICES=3 python generation/diffusers_generate.py --lora_step 316 --outdir "counting_coco80_10_step20_guidance_7" --metadata_file "/openseg_blob/zhaoyaqi/flow_grpo/dataset/counting/test_metadata.jsonl" &
 
+# conda activate reward_server
+
+# CUDA_VISIBLE_DEVICES=0 python evaluation/evaluate_images.py "sd-3.5-m-base-coco80-8k-ft-step3k" &
+# CUDA_VISIBLE_DEVICES=2 python evaluation/evaluate_images.py "sd-3.5-m-base-coco80-8k-ft-step5k" &
+
+# python evaluation/summary_scores.py "sd-3.5-m-base-coco80-8k-ft-step3k" 
+# python evaluation/summary_scores.py "sd-3.5-m-base-coco80-8k-ft-step5k" 
 
 wait
 

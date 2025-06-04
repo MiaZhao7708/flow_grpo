@@ -22,7 +22,7 @@ with open(os.path.join(os.path.dirname(__file__), "object_names.txt")) as cls_fi
 # Load results
 base_dir = "/openseg_blob/zhaoyaqi/workspace/coco80_grpo_counting_sd3_5_medium/summary_scores"
 os.makedirs(base_dir, exist_ok=True)
-df = pd.read_json(os.path.join(base_dir.replace('summary_scores', 'output_eval'), args.imagedir, "results.jsonl"), orient="records", lines=True)
+df = pd.read_json(os.path.join(base_dir.replace('summary_scores', 'output_eval'), args.imagedir, "results_the09.jsonl"), orient="records", lines=True)
 
 # Measure overall success
 
@@ -130,6 +130,20 @@ with open(output_path, "w") as f:
     for count in counts:
         stats = count_stats[count]
         f.write(f"Count {count}: {stats['correct']}/{stats['total']} = {stats['correct']/stats['total']:.2%}\n")
+    
+    # Calculate range accuracies
+    def calculate_range_accuracy(count_stats, start, end):
+        correct = sum(count_stats[i]['correct'] for i in range(start, end + 1) if i in count_stats)
+        total = sum(count_stats[i]['total'] for i in range(start, end + 1) if i in count_stats)
+        return correct / total if total > 0 else 0
+
+    # Output range accuracies
+    f.write("\nRange Accuracies:\n")
+    ranges = [(1, 5), (1, 10), (1, 20)]
+    for start, end in ranges:
+        acc = calculate_range_accuracy(count_stats, start, end)
+        f.write(f"Range {start}-{end}: {acc:.2%}\n")
+        print(f"Range {start}-{end} accuracy: {acc:.2%}")
 
 print(f"Results saved to {output_path}")
 print(f"Count accuracy plot saved to {plot_path}")

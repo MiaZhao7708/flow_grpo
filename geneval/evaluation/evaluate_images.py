@@ -296,5 +296,8 @@ if __name__ == "__main__":
     MAX_OBJECTS = int(args.options.get('max_objects', 50))
     NMS_THRESHOLD = float(args.options.get('max_overlap', 1.0))
     POSITION_THRESHOLD = float(args.options.get('position_threshold', 0.1))
+    print('---------- Counting threshold: ', COUNTING_THRESHOLD)
+    print('---------- Max objects: ', MAX_OBJECTS)
+    print('---------- NMS threshold: ', NMS_THRESHOLD)
 
     main(args)
