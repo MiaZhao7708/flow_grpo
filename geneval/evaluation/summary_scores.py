@@ -22,7 +22,7 @@ with open(os.path.join(os.path.dirname(__file__), "object_names.txt")) as cls_fi
 # Load results
 base_dir = "/openseg_blob/zhaoyaqi/workspace/coco80_grpo_counting_sd3_5_medium/summary_scores"
 os.makedirs(base_dir, exist_ok=True)
-df = pd.read_json(os.path.join(base_dir.replace('summary_scores', 'output_eval'), args.imagedir, "results_the09.jsonl"), orient="records", lines=True)
+df = pd.read_json(os.path.join(base_dir.replace('summary_scores', 'output_eval'), args.imagedir, "results.jsonl"), orient="records", lines=True)
 
 # Measure overall success
 
