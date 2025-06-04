@@ -265,6 +265,7 @@ def main(args):
     base_outdir_img = '/openseg_blob/zhaoyaqi/workspace/coco80_grpo_counting_sd3_5_medium/output_eval'
     # base_outdir_summary = "/openseg_blob/zhaoyaqi/workspace/flow_grpo/geneval/summary_scores"
     base_outdir_summary = '/openseg_blob/zhaoyaqi/workspace/coco80_grpo_counting_sd3_5_medium/summary_scores'
+    os.makedirs(base_outdir_summary, exist_ok=True)
     args.imagedir = os.path.join(base_outdir_img, args.imagedir)
     for subfolder in tqdm(os.listdir(args.imagedir),desc="Evaluating images"):
         folderpath = os.path.join(args.imagedir, subfolder)
@@ -282,8 +283,7 @@ def main(args):
     # Save results
     args.outfile = os.path.join(base_outdir_summary, args.imagedir, args.outfile)
     # print(f"---------- Output directory: {args.outfile} ----------")
-    if os.path.dirname(args.outfile):
-        os.makedirs(os.path.dirname(args.outfile), exist_ok=True)
+    os.makedirs(os.path.dirname(args.outfile), exist_ok=True)
     with open(args.outfile, "w") as fp:
         pd.DataFrame(full_results).to_json(fp, orient="records", lines=True)
     print(f"---------- Output file: {args.outfile} ----------")

@@ -37,7 +37,8 @@ def parse_args():
     parser = argparse.ArgumentParser()
     parser.add_argument(
         "--metadata_file",
-        default="/openseg_blob/zhaoyaqi/workspace/flow_grpo/geneval/prompts/evaluation_metadata.jsonl",
+        # default="/openseg_blob/zhaoyaqi/workspace/flow_grpo/geneval/prompts/evaluation_metadata.jsonl",
+        default='/openseg_blob/zhaoyaqi/flow_grpo/dataset/counting_20/test_metadata.jsonl',
         type=str,
         help="JSONL file containing lines of metadata for each prompt"
     )
@@ -97,7 +98,8 @@ def parse_args():
         "--scale",
         type=float,
         # default=9.0,
-        default=4.5,
+        # default=4.5,
+        default=7.0,
         help="unconditional guidance scale: eps = eps(x, empty) + scale * (eps(x, cond) - eps(x, empty))",
     )
     parser.add_argument(

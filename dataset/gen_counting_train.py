@@ -104,12 +104,12 @@ prompt_list_single = [
     "A straightforward depiction of {article} {object} set against an understated gray backdrop.",
     "A clean representation of {article} {object} positioned on a neutral gray surface."
 ]
-def generate_metadata(object_names, output_file, max_num):
+def generate_metadata(object_names, output_file, min_num, max_num):
     metadata_list = []
     
     for animal in object_names:
         # 获取正确的复数形式
-        for number in range(1, max_num + 1):
+        for number in range(min_num, max_num + 1):
             for index in range(len(prompt_list)):
                 # 根据数量决定是否使用复数形式
                 object_form = get_plural_form(animal) if number > 1 else animal
@@ -144,9 +144,10 @@ def generate_metadata(object_names, output_file, max_num):
 def main():
     # 设置路径
     import os
-    max_num = 20
+    min_num = 6
+    max_num = 10
     object_names_path = "/openseg_blob/zhaoyaqi/flow_grpo/reward-server/reward_server/object_names.txt"
-    output_path = f"/openseg_blob/zhaoyaqi/flow_grpo/dataset/counting_{max_num}/metadata_1_{max_num}.jsonl"
+    output_path = f"/openseg_blob/zhaoyaqi/flow_grpo/dataset/counting_{min_num}_{max_num}/metadata_{min_num}_{max_num}.jsonl"
     os.makedirs(os.path.dirname(output_path), exist_ok=True)
     
     # 确保输出目录存在
@@ -156,7 +157,7 @@ def main():
     object_names = load_object_names(object_names_path)
     
     # 生成metadata
-    generate_metadata(object_names, output_path, max_num)
+    generate_metadata(object_names, output_path, min_num, max_num)
     print(f"Generated metadata saved to {output_path}")
 
 if __name__ == "__main__":
