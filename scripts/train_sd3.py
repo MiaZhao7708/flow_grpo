@@ -500,8 +500,6 @@ def main(_):
     unique_id = datetime.datetime.now().strftime("%Y.%m.%d_%H.%M.%S")
     if not config.run_name:
         config.run_name = unique_id
-    else:
-        config.run_name += "_" + unique_id
 
     if config.resume_from:
         config.resume_from = os.path.normpath(os.path.expanduser(config.resume_from))
