@@ -15,7 +15,7 @@ import debugpy
 #     print(f"Debugpy initialization failed: {e}")
 
 import os
-os.environ['PYDEVD_WARN_SLOW_RESOLVE_TIMEOUT'] = '10.0'  
+os.environ['PYDEVD_WARN_SLOW_RESOLVE_TIMEOUT'] = '10.0'  # 设置为5秒
 from absl import app, flags
 from accelerate import Accelerator, DistributedType
 from ml_collections import config_flags
@@ -258,6 +258,143 @@ def compute_log_prob(transformer, pipeline, sample, j, embeds, pooled_embeds, co
 
     return prev_sample, log_prob, prev_sample_mean, std_dev_t
 
+# def eval(pipeline, test_dataloader, text_encoders, tokenizers, config, accelerator, global_step, reward_fn, executor, autocast, num_train_timesteps, ema, transformer_trainable_parameters):
+#     if config.train.ema:
+#         ema.copy_ema_to(transformer_trainable_parameters, store_temp=True)
+#     neg_prompt_embed, neg_pooled_prompt_embed = compute_text_embeddings([""], text_encoders, tokenizers, max_sequence_length=128, device=accelerator.device)
+
+#     sample_neg_prompt_embeds = neg_prompt_embed.repeat(config.sample.test_batch_size, 1, 1)
+#     sample_neg_pooled_prompt_embeds = neg_pooled_prompt_embed.repeat(config.sample.test_batch_size, 1)
+
+#     # 创建保存目录
+#     eval_save_dir = "/openseg_blob/zhaoyaqi/workspace/coco80_grpo_counting_sd3_5_medium/eval_step_during_training"
+#     step_save_dir = os.path.join(eval_save_dir, f"step_{global_step}")
+#     if accelerator.is_main_process:
+#         os.makedirs(step_save_dir, exist_ok=True)
+
+#     # test_dataloader = itertools.islice(test_dataloader, 2)
+#     all_rewards = defaultdict(list)
+#     all_images = []
+#     all_prompts = []
+#     all_prompt_metadata = []
+#     for test_batch in tqdm(
+#             test_dataloader,
+#             desc="Eval: ",
+#             disable=not accelerator.is_local_main_process,
+#             position=0,
+#         ):
+#         prompts, prompt_metadata = test_batch
+#         prompt_embeds, pooled_prompt_embeds = compute_text_embeddings(
+#             prompts, 
+#             text_encoders, 
+#             tokenizers, 
+#             max_sequence_length=128, 
+#             device=accelerator.device
+#         )
+#         # 最后一个batch可能不够batch_size
+#         if len(prompt_embeds)<len(sample_neg_prompt_embeds):
+#             sample_neg_prompt_embeds = sample_neg_prompt_embeds[:len(prompt_embeds)]
+#             sample_neg_pooled_prompt_embeds = sample_neg_pooled_prompt_embeds[:len(prompt_embeds)]
+#         with autocast():
+#             with torch.no_grad():
+#                 images, latents, log_probs, _ = pipeline_with_logprob(
+#                     pipeline,
+#                     prompt_embeds=prompt_embeds,
+#                     pooled_prompt_embeds=pooled_prompt_embeds,
+#                     negative_prompt_embeds=sample_neg_prompt_embeds,
+#                     negative_pooled_prompt_embeds=sample_neg_pooled_prompt_embeds,
+#                     num_inference_steps=config.sample.eval_num_steps,
+#                     guidance_scale=config.sample.guidance_scale,
+#                     output_type="pt",
+#                     return_dict=False,
+#                     height=config.resolution,
+#                     width=config.resolution, 
+#                     determistic=True,
+#                 )
+#         rewards = executor.submit(reward_fn, images, prompts, prompt_metadata, only_strict=False)
+#         # yield to to make sure reward computation starts
+#         time.sleep(0)
+#         rewards, reward_metadata = rewards.result()
+
+#         # 收集所有图片和提示词
+#         all_images.extend(images.cpu())
+#         all_prompts.extend(prompts)
+#         all_prompt_metadata.extend(prompt_metadata)
+
+#         for key, value in rewards.items():
+#             rewards_gather = accelerator.gather(torch.as_tensor(value, device=accelerator.device)).cpu().numpy()
+#             all_rewards[key].append(rewards_gather)
+    
+#     # 收集所有进程的数据
+#     all_images_gather = accelerator.gather(torch.stack(all_images)).cpu().numpy()
+#     all_prompt_ids = tokenizers[0](
+#         all_prompts,
+#         padding="max_length",
+#         max_length=77,
+#         truncation=True,
+#         return_tensors="pt",
+#     ).input_ids.to(accelerator.device)
+#     all_prompt_ids_gather = accelerator.gather(all_prompt_ids).cpu().numpy()
+#     all_prompts_gather = pipeline.tokenizer.batch_decode(
+#         all_prompt_ids_gather, skip_special_tokens=True
+#     )
+#     all_rewards = {key: np.concatenate(value) for key, value in all_rewards.items()}
+
+#     if accelerator.is_main_process:
+#         # 保存所有图片
+#         for idx, (image, prompt) in enumerate(zip(all_images_gather, all_prompts_gather)):
+#             pil = Image.fromarray(
+#                 (image.transpose(1, 2, 0) * 255).astype(np.uint8)
+#             )
+#             pil = pil.resize((config.resolution, config.resolution))
+#             # 保存图片
+#             pil.save(os.path.join(step_save_dir, f"{idx}.jpg"))
+        
+#         # 保存提示词和评估指标
+#         results = {
+#             "prompts": all_prompts_gather,
+#             "rewards": {k: v.tolist() for k, v in all_rewards.items()},
+#             "prompt_metadata": all_prompt_metadata,
+#             "metrics": {
+#                 f"eval_reward_{key}": float(np.mean(value[value != -10])) 
+#                 for key, value in all_rewards.items()
+#             }
+#         }
+        
+#         # 保存结果到JSON文件
+#         with open(os.path.join(step_save_dir, "eval_results.json"), "w") as f:
+#             json.dump(results, f, indent=2)
+
+#         # 记录到wandb
+#         with tempfile.TemporaryDirectory() as tmpdir:
+#             num_samples = min(15, len(all_images_gather))
+#             sample_indices = range(num_samples)
+#             for idx, index in enumerate(sample_indices):
+#                 image = all_images_gather[index]
+#                 pil = Image.fromarray(
+#                     (image.transpose(1, 2, 0) * 255).astype(np.uint8)
+#                 )
+#                 pil = pil.resize((config.resolution, config.resolution))
+#                 pil.save(os.path.join(tmpdir, f"{idx}.jpg"))
+#             sampled_prompts = [all_prompts_gather[index] for index in sample_indices]
+#             sampled_rewards = [{k: all_rewards[k][index] for k in all_rewards} for index in sample_indices]
+#             for key, value in all_rewards.items():
+#                 print(key, value.shape)
+#             accelerator.log(
+#                 {
+#                     "eval_images": [
+#                         wandb.Image(
+#                             os.path.join(tmpdir, f"{idx}.jpg"),
+#                             caption=f"{prompt:.1000} | " + " | ".join(f"{k}: {v:.2f}" for k, v in reward.items() if v != -10),
+#                         )
+#                         for idx, (prompt, reward) in enumerate(zip(sampled_prompts, sampled_rewards))
+#                     ],
+#                     **{f"eval_reward_{key}": np.mean(value[value != -10]) for key, value in all_rewards.items()},
+#                 },
+#                 step=global_step,
+#             )
+#     if config.train.ema:
+#         ema.copy_temp_to(transformer_trainable_parameters)
 
 def eval(pipeline, test_dataloader, text_encoders, tokenizers, config, accelerator, global_step, reward_fn, executor, autocast, num_train_timesteps, ema, transformer_trainable_parameters):
     if config.train.ema:
@@ -402,96 +539,56 @@ def eval(pipeline, test_dataloader, text_encoders, tokenizers, config, accelerat
     if config.train.ema:
         ema.copy_temp_to(transformer_trainable_parameters)
 
-
-# added by yaqi
-def check_lora_loading_status(transformer, accelerator):
-    """检查LoRA加载状态"""
-    if accelerator.is_main_process:
-        # 检查是否有adapter
-        if hasattr(transformer, 'peft_config'):
-            print("✓ PEFT Config found:")
-            for adapter_name, config in transformer.peft_config.items():
-                print(f"  - Adapter: {adapter_name}, Type: {type(config).__name__}")
-                print(f"    Rank: {config.r}, Alpha: {config.lora_alpha}")
-                print(f"    Target modules: {config.target_modules}")
-        
-        # 检查当前激活的adapter
-        if hasattr(transformer, 'active_adapters'):
-            print(f"✓ Active adapters: {transformer.active_adapters}")
-        
-        # 检查可训练参数数量
-        trainable_params = sum(p.numel() for p in transformer.parameters() if p.requires_grad)
-        total_params = sum(p.numel() for p in transformer.parameters())
-        print(f"✓ Trainable parameters: {trainable_params:,} / {total_params:,} ({100*trainable_params/total_params:.2f}%)")
-        
-        # 检查LoRA参数是否存在
-        lora_params = {}
-        for name, param in transformer.named_parameters():
-            if 'lora_' in name and param.requires_grad:
-                lora_params[name] = param.data.abs().mean().item()
-        
-        if lora_params:
-            print(f"✓ Found {len(lora_params)} LoRA parameters:")
-            for i, (name, mean_val) in enumerate(lora_params.items()):
-                if i < 5:  # 只显示前5个
-                    print(f"  - {name}: mean_abs_value = {mean_val:.6f}")
-                elif i == 5:
-                    print(f"  - ... and {len(lora_params)-5} more")
-                    break
-        else:
-            print("⚠️ No LoRA parameters found!")
-        
-        print("-" * 50)
-
-
-# --------- custom save and load model hook, changed by yaqi, for correct resume ---------
 def unwrap_model(model, accelerator):
     model = accelerator.unwrap_model(model)
     model = model._orig_mod if is_compiled_module(model) else model
     return model
 
-def save_model_hook_partial(models, weights, output_dir, accelerator, transformer, config, ema, transformer_trainable_parameters):
-    """自定义模型保存hook - 保存LoRA权重"""
-    if accelerator.is_main_process and len(weights) > 0:
-        for model in models:
-            if isinstance(model, type(unwrap_model(transformer, accelerator))):
-                # 如果使用EMA，先将EMA权重复制到模型中
-                if config.train.ema:
-                    ema.copy_ema_to(transformer_trainable_parameters, store_temp=True)
-                
-                # 直接使用PEFT的save_pretrained保存LoRA权重
-                lora_save_path = os.path.join(output_dir, "lora")
-                unwrap_model(model, accelerator).save_pretrained(lora_save_path)
-                
-                # 如果使用EMA，恢复原来的权重
-                if config.train.ema:
-                    ema.copy_temp_to(transformer_trainable_parameters)
-            else:
-                raise ValueError(f"unexpected save model: {model.__class__}")
-            
-            # 从weights中移除，避免accelerator重复保存模型
-            weights.pop()
+def save_ckpt(save_dir, transformer, global_step, accelerator, ema, transformer_trainable_parameters, config):
+    save_root = os.path.join(save_dir, "checkpoints", f"checkpoint-{global_step}")
+    save_root_lora = os.path.join(save_root, "lora")
+    
+    # 等待所有进程
+    accelerator.wait_for_everyone()
+    
+    if accelerator.is_main_process:
+        os.makedirs(save_root_lora, exist_ok=True)
+        
+        if config.train.ema:
+            ema.copy_ema_to(transformer_trainable_parameters, store_temp=True)
+        unwrap_model(transformer, accelerator).save_pretrained(save_root_lora)
+        if config.train.ema:
+            ema.copy_temp_to(transformer_trainable_parameters)
+    
+        # added by yaqi
+        extra_state = {
+            "global_step": global_step,
+            "config": config.to_dict(),
+        }
+        
+        with open(os.path.join(save_root, "extra_state.json"), "w") as f:
+            json.dump(extra_state, f)
+    
+    # 等待主进程完成文件保存
+    accelerator.wait_for_everyone()
+    
+    # 所有进程都需要调用 save_state
+    accelerator.save_state(save_root)
+    
+    # 最后再等待所有进程完成
+    accelerator.wait_for_everyone()
 
-def load_model_hook_partial(models, input_dir, accelerator, transformer):
-    """自定义模型加载hook - 加载LoRA权重"""
-    if len(models) > 0:
-        transformer_ = None
-        
-        while len(models) > 0:
-            model = models.pop()
-            
-            if isinstance(model, type(unwrap_model(transformer, accelerator))):
-                transformer_ = model
-            else:
-                raise ValueError(f"unexpected load model: {model.__class__}")
-        
-        # 加载LoRA权重
-        lora_path = os.path.join(input_dir, "lora")
-        if os.path.exists(lora_path):
-            # 使用load_adapter加载LoRA权重，这与PeftModel.from_pretrained在功能上是等价的
-            transformer_.load_adapter(lora_path, adapter_name="default")
-            transformer_.set_adapter("default")
-            logger.info(f"Loaded LoRA weights from {lora_path}")
+def save_model_hook_partial(models, weights, output_dir):
+    """自定义模型保存hook - 跳过模型保存"""
+    # 直接返回空，让accelerator跳过模型保存
+    # 因为我们已经在resume_from时通过PEFT加载了LoRA权重
+    return  # 返回空，告诉accelerator跳过默认的模型保存
+
+def load_model_hook_partial(models, input_dir):
+    """自定义模型加载hook - 跳过模型加载"""
+    # 直接返回空，让accelerator跳过模型加载
+    # 因为我们已经在resume_from时通过PEFT加载了LoRA权重
+    return  # 返回空，告诉accelerator跳过默认的模型加载
 
 def main(_):
     # basic Accelerate and logging setup
@@ -523,7 +620,6 @@ def main(_):
     # number of timesteps within each trajectory to train on
     num_train_timesteps = int(config.sample.num_steps * config.train.timestep_fraction)
 
-    # changed by yaqi
     accelerator_config = ProjectConfiguration(
         # project_dir=os.path.join(config.logdir, config.run_name),
         project_dir=config.save_dir,
@@ -543,6 +639,7 @@ def main(_):
         * num_train_timesteps,
     )
 
+    
 
     if accelerator.is_main_process:
         accelerator.init_trackers(
@@ -623,9 +720,14 @@ def main(_):
             init_lora_weights="gaussian",
             target_modules=target_modules,
         )
-
-        # changed by yaqi, merge in load_state
-        pipeline.transformer = get_peft_model(pipeline.transformer, transformer_lora_config)
+        # if config.train.lora_path:
+        if config.resume_from:
+            lora_path = os.path.join(config.resume_from, "lora")
+            pipeline.transformer = PeftModel.from_pretrained(pipeline.transformer, lora_path)
+            # 使用PeftModel.from_pretrained load后所有参数的requires_grad都是False，需要set_adapter来使得adapter参数梯度为True
+            pipeline.transformer.set_adapter("default")
+        else:
+            pipeline.transformer = get_peft_model(pipeline.transformer, transformer_lora_config)
     
     transformer = pipeline.transformer
     transformer_trainable_parameters = list(filter(lambda p: p.requires_grad, transformer.parameters()))
@@ -746,32 +848,9 @@ def main(_):
     autocast = contextlib.nullcontext if config.use_lora else accelerator.autocast
     # autocast = accelerator.autocast
 
-    # changed by yaqi
-    # Register save and load hooks
-    save_model_hook = partial(
-        save_model_hook_partial,
-        accelerator=accelerator,
-        transformer=transformer,
-        config=config,
-        ema=ema,
-        transformer_trainable_parameters=transformer_trainable_parameters,
-    )
-    load_model_hook = partial(
-        load_model_hook_partial,
-        accelerator=accelerator,
-        transformer=transformer,
-    )
-    accelerator.register_save_state_pre_hook(save_model_hook)
-    accelerator.register_load_state_pre_hook(load_model_hook)
-
     # Prepare everything with our `accelerator`.
     transformer, optimizer, train_dataloader, test_dataloader = accelerator.prepare(transformer, optimizer, train_dataloader, test_dataloader)
     
-    # 检查初始LoRA状态
-    if accelerator.is_main_process:
-        print("=== Initial LoRA Status ===")
-    check_lora_loading_status(transformer, accelerator)
-
     # executor to perform callbacks asynchronously. this is beneficial for the llava callbacks which makes a request to a
     # remote server running llava inference.
     executor = futures.ThreadPoolExecutor(max_workers=8)
@@ -809,26 +888,18 @@ def main(_):
     # assert config.sample.train_batch_size % config.train.batch_size == 0
     # assert samples_per_epoch % total_train_batch_size == 0
 
-    # changed by yaqi
     if config.resume_from:
         logger.info(f"Resuming from {config.resume_from}")
         accelerator.load_state(config.resume_from)
-        
-        # 从文件夹名提取global_step，格式如 checkpoint-1000
-        checkpoint_name = os.path.basename(config.resume_from)
-        if "checkpoint-" in checkpoint_name:
-            global_step = int(checkpoint_name.split("-")[-1])
-        else:
-            raise ValueError(f"Cannot extract global_step from checkpoint name: {checkpoint_name}")
-            
+        # changed by yaqi
+        # first_epoch = int(config.resume_from.split("_")[-1]) + 1
+        with open(os.path.join(config.resume_from, "extra_state.json"), "r") as f:
+            extra_state = json.load(f)
+            global_step = extra_state["global_step"]
+        # global_step = int(config.resume_from.split("_")[-1])
         ratio = config.sample.num_batches_per_epoch // config.train.gradient_accumulation_steps # 2
         first_epoch = (global_step + ratio*2) // ratio
         logger.info(f"Resuming from epoch {first_epoch}, global step {global_step}")
-        
-        # 检查resume后的LoRA状态
-        if accelerator.is_main_process:
-            print("=== LoRA Status After Resume ===")
-        check_lora_loading_status(transformer, accelerator)
     else:
         first_epoch = 0
         global_step = 0
@@ -836,7 +907,13 @@ def main(_):
     # global_step = 0
     train_iter = iter(train_dataloader)
     
-
+    # progress_bar = tqdm(
+    #     range(0, config.num_epochs * config.sample.num_batches_per_epoch // config.train.gradient_accumulation_steps),
+    #     initial=global_step,
+    #     desc="Steps",
+    #     # Only show the progress bar once on each machine.
+    #     disable=not accelerator.is_local_main_process,
+    # )
     for epoch in range(first_epoch, config.num_epochs):
         #################### SAMPLING ####################
         pipeline.transformer.eval()
@@ -873,8 +950,8 @@ def main(_):
                 eval(pipeline, test_dataloader, text_encoders, tokenizers, config, accelerator, global_step, eval_reward_fn, executor, autocast, num_train_timesteps, ema, transformer_trainable_parameters)
             
             if i==0 and epoch % config.save_freq == 0 and epoch>0:
-                save_root = os.path.join(config.save_dir, "checkpoints", f"checkpoint-{global_step}")
-                accelerator.save_state(save_root)
+                # 所有进程都参与保存
+                save_ckpt(config.save_dir, transformer, global_step, accelerator, ema, transformer_trainable_parameters, config)
                 if accelerator.is_main_process:
                     print(f"Model checkpoint and state saved at step {global_step}")
 
