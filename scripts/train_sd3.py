@@ -865,8 +865,8 @@ def main(_):
                 return_tensors="pt",
             ).input_ids.to(accelerator.device)
             
-            # if i==0 and epoch % config.eval_freq == 0:
-            if i==0 and epoch % config.eval_freq == 0 and epoch>0: # resume_test
+            if i==0 and epoch % config.eval_freq == 0:
+            # if i==0 and epoch % config.eval_freq == 0 and epoch>0: # resume_test
                 # eval
                 eval(pipeline, test_dataloader, text_encoders, tokenizers, config, accelerator, global_step, eval_reward_fn, executor, autocast, num_train_timesteps, ema, transformer_trainable_parameters)
             
