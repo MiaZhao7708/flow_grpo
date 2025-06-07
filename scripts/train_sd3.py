@@ -7,12 +7,12 @@ import time
 import json
 import debugpy
 
-try:
-    debugpy.listen(('0.0.0.0', 8897))
-    print(f"Process waiting for debugger to attach on port 8897...")
-    debugpy.wait_for_client()
-except Exception as e:
-    print(f"Debugpy initialization failed: {e}")
+# try:
+#     debugpy.listen(('0.0.0.0', 8897))
+#     print(f"Process waiting for debugger to attach on port 8897...")
+#     debugpy.wait_for_client()
+# except Exception as e:
+#     print(f"Debugpy initialization failed: {e}")
 
 import os
 os.environ['PYDEVD_WARN_SLOW_RESOLVE_TIMEOUT'] = '10.0'  
@@ -519,7 +519,7 @@ def main(_):
 
     # TODO: timestep_fraction?
     # number of timesteps within each trajectory to train on
-    num_train_timesteps = int(config.sample.num_steps * config.train.timestep_fraction)
+    num_train_timesteps = int(config.sample.num_steps * config.train.timestep_fraction) # fraction
 
     # changed by yaqi
     accelerator_config = ProjectConfiguration(
@@ -1098,13 +1098,23 @@ def main(_):
             samples = {k: v[perm] for k, v in samples.items()}
 
             # shuffle along time dimension independently for each sample
-            perms = torch.stack(
-                [
-                    # torch.randperm(num_timesteps, device=accelerator.device)
-                    torch.arange(num_timesteps, device=accelerator.device)
-                    for _ in range(total_batch_size)
-                ]
-            ) # 144,10 
+            # custom
+            if config.train.timestep_select_strategy == "first":
+                perms = torch.stack(
+                    [
+                        # torch.randperm(num_timesteps, device=accelerator.device)
+                        torch.arange(num_timesteps, device=accelerator.device)
+                        for _ in range(total_batch_size)
+                    ]
+                ) 
+            elif config.train.timestep_select_strategy == "random":
+                perms = torch.stack(
+                    [
+                        torch.randperm(num_timesteps, device=accelerator.device)
+                        for _ in range(total_batch_size)
+                    ]
+                ) 
+            
             for key in ["timesteps", "latents", "next_latents", "log_probs"]:
                 samples[key] = samples[key][
                     torch.arange(total_batch_size, device=accelerator.device)[:, None],
