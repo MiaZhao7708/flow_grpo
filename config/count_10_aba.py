@@ -126,7 +126,7 @@ def geneval_sd3_counting_10_step20_init_same_noise():
 def geneval_sd3_counting_10_step20_timestep_select_first_50():
     config = compressibility()
     config.dataset = os.path.join(os.getcwd(), "dataset/counting")
-    config.run_name = "0607_counting_coco80_10_step20_guidance_7_v5_timestep_select_first_50_bizv_01"
+    config.run_name = "0607_counting_coco80_10_step20_guidance_7_v5_timestep_select_first_50_aigc11"
 
     # sd3.5 medium
     config.pretrained.model = "stabilityai/stable-diffusion-3.5-medium"
@@ -173,7 +173,7 @@ def geneval_sd3_counting_10_step20_timestep_select_first_50():
 def geneval_sd3_counting_10_step20_timestep_select_random_50():
     config = compressibility()
     config.dataset = os.path.join(os.getcwd(), "dataset/counting")
-    config.run_name = "0607_counting_coco80_10_step20_guidance_7_v5_timestep_select_random_50_bizv_05"
+    config.run_name = "0607_counting_coco80_10_step20_guidance_7_v5_timestep_select_random_50_aigc12"
 
     # sd3.5 medium
     config.pretrained.model = "stabilityai/stable-diffusion-3.5-medium"
