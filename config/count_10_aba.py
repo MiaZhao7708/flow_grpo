@@ -27,6 +27,8 @@ def compressibility():
     config.per_prompt_stat_tracking = True
     return config
 
+
+##### cold start #####
 def geneval_sd3_counting_10_step20_cold_start_from_3k():
     config = compressibility()
     config.dataset = os.path.join(os.getcwd(), "dataset/counting")
@@ -45,6 +47,54 @@ def geneval_sd3_counting_10_step20_cold_start_from_3k():
     config.sample.train_batch_size = 6
     config.sample.num_image_per_prompt = 12 # device_num = 4
     # config.sample.num_image_per_prompt = 3 # device_num = 1 
+    config.sample.num_batches_per_epoch = 24
+    config.sample.test_batch_size = 10 # This bs is a special design, the test set has a total of 2212, to make gpu_num*bs*n as close as possible to 2212, because when the number of samples cannot be divided evenly by the number of cards, multi-card will fill the last batch to ensure each card has the same number of samples, affecting gradient synchronization.
+
+    config.train.batch_size = config.sample.train_batch_size
+    config.train.gradient_accumulation_steps = config.sample.num_batches_per_epoch//2 # 24/2=12
+    config.train.num_inner_epochs = 1
+    config.train.timestep_fraction = 0.99
+    config.train.beta = 0.01
+    config.sample.kl_reward = 0
+    config.sample.global_std=True
+    config.train.ema=True
+    config.num_epochs = 100000
+    # config.save_freq = 30 # epoch
+    # config.eval_freq = 60
+    config.save_freq = 10 # epoch
+    config.eval_freq = 20
+    config.save_dir = '/openseg_blob/zhaoyaqi/workspace/coco80_grpo_counting_sd3_5_medium/output/counting_coco80_10_step20_guidance_7_v5_cold_start_from_3k'
+    config.reward_fn = {
+        "geneval": 1.0,
+    }
+    
+    config.prompt_fn = "geneval"
+
+    config.per_prompt_stat_tracking = True
+    return config
+
+
+##### init_same_noise #####
+def geneval_sd3_counting_10_step20_init_same_noise():
+    config = compressibility()
+    config.dataset = os.path.join(os.getcwd(), "dataset/counting")
+    config.run_name = "0607_counting_coco80_10_step20_guidance_7_v5_init_same_noise_aigc09"
+
+    # sd3.5 medium
+    config.pretrained.model = "stabilityai/stable-diffusion-3.5-medium"
+    config.merge_lora_path = '/openseg_blob/zhaoyaqi/workspace/coco80_grpo_counting_sd3_5_medium/output/sd_3_5_medium_base_data_8k_coco80_v5/checkpoint-3000'
+    config.sample.num_steps = 20 # 40
+    config.sample.eval_num_steps = 40
+    # config.sample.guidance_scale = 4.5
+    config.sample.guidance_scale = 7.0
+    config.sample.init_same_noise = True
+
+    # 8 cards to start LLaVA Server
+    config.resolution = 512
+    config.sample.train_batch_size = 6
+    config.sample.num_image_per_prompt = 12 # device_num = 4
+    # config.sample.num_image_per_prompt = 3 # device_num = 1 
+
     config.sample.num_batches_per_epoch = 24
     config.sample.test_batch_size = 10 # This bs is a special design, the test set has a total of 2212, to make gpu_num*bs*n as close as possible to 2212, because when the number of samples cannot be divided evenly by the number of cards, multi-card will fill the last batch to ensure each card has the same number of samples, affecting gradient synchronization.
 

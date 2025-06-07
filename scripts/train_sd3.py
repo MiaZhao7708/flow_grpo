@@ -7,12 +7,12 @@ import time
 import json
 import debugpy
 
-# try:
-#     debugpy.listen(('0.0.0.0', 8899))
-#     print(f"Process waiting for debugger to attach on port 8899...")
-#     debugpy.wait_for_client()
-# except Exception as e:
-#     print(f"Debugpy initialization failed: {e}")
+try:
+    debugpy.listen(('0.0.0.0', 8897))
+    print(f"Process waiting for debugger to attach on port 8897...")
+    debugpy.wait_for_client()
+except Exception as e:
+    print(f"Debugpy initialization failed: {e}")
 
 import os
 os.environ['PYDEVD_WARN_SLOW_RESOLVE_TIMEOUT'] = '10.0'  
@@ -856,7 +856,8 @@ def main(_):
                 tokenizers, 
                 max_sequence_length=128, 
                 device=accelerator.device
-            )
+            ) # 6,205,4096
+            
             prompt_ids = tokenizers[0](
                 prompts,
                 padding="max_length",
@@ -880,6 +881,17 @@ def main(_):
             if epoch < 2:
                 continue
             
+            # for convenience, init the same noise for all samples in the same batch
+            if config.sample.init_same_noise:
+                global_input_latents = torch.randn(
+                    (1, 16, 64, 64),
+                    device=accelerator.device,
+                    dtype=prompt_embeds.dtype,
+                )
+                input_latents = global_input_latents.repeat(config.sample.train_batch_size, 1, 1, 1)
+            else:
+                input_latents = None
+
             # sample
             with autocast():
                 with torch.no_grad():
@@ -896,6 +908,7 @@ def main(_):
                         height=config.resolution,
                         width=config.resolution, 
                         kl_reward=config.sample.kl_reward,
+                        latents=input_latents, # init the same noise for all samples in the same batch
                 )
 
             latents = torch.stack(
