@@ -149,7 +149,7 @@ def geneval_sd3_counting_10_step20_timestep_select_first_50():
     config.train.gradient_accumulation_steps = config.sample.num_batches_per_epoch//2 # 24/2=12
     config.train.num_inner_epochs = 1
     config.train.timestep_fraction = 0.5
-    config.train.timestep_select_strategy = "first"
+    config.train.timestep_select_strategy = "first" # custom
     config.train.beta = 0.01
     config.sample.kl_reward = 0
     config.sample.global_std=True
@@ -173,6 +173,7 @@ def geneval_sd3_counting_10_step20_timestep_select_random_50():
     config = compressibility()
     config.dataset = os.path.join(os.getcwd(), "dataset/counting")
     config.run_name = "0607_counting_coco80_10_step20_guidance_7_v5_timestep_select_random_50_aigc12"
+    config.resume_from = '/openseg_blob/zhaoyaqi/workspace/coco80_grpo_counting_sd3_5_medium/output/counting_coco80_10_step20_guidance_7_v5_timestep_select_random_50/checkpoints'
 
     # sd3.5 medium
     config.pretrained.model = "stabilityai/stable-diffusion-3.5-medium"

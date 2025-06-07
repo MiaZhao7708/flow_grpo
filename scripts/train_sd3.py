@@ -514,7 +514,8 @@ def main(_):
                 raise ValueError(f"No checkpoints found in {config.resume_from}")
             config.resume_from = os.path.join(
                 config.resume_from,
-                sorted(checkpoints, key=lambda x: int(x.split("_")[-1]))[-1],
+                # sorted(checkpoints, key=lambda x: int(x.split("_")[-1]))[-1],
+                sorted(checkpoints, key=lambda x: int(x.split("-")[-1]))[-1],
             )
 
     # TODO: timestep_fraction?
