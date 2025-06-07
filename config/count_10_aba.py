@@ -209,7 +209,7 @@ def geneval_sd3_counting_10_step20_timestep_select_random_50():
     config.eval_freq = 20
     config.save_dir = '/openseg_blob/zhaoyaqi/workspace/coco80_grpo_counting_sd3_5_medium/output/counting_coco80_10_step20_guidance_7_v5_timestep_select_random_50'
     config.reward_fn = {
-        "geneval": 1.0,
+        "geneval_debug": 1.0,
     }
     
     config.prompt_fn = "geneval"
