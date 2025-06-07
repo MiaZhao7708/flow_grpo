@@ -135,7 +135,6 @@ def geneval_sd3_counting_10_step20_timestep_select_first_50():
     config.sample.eval_num_steps = 40
     # config.sample.guidance_scale = 4.5
     config.sample.guidance_scale = 7.0
-    config.sample.init_same_noise = True
 
     # 8 cards to start LLaVA Server
     config.resolution = 512
@@ -182,7 +181,6 @@ def geneval_sd3_counting_10_step20_timestep_select_random_50():
     config.sample.eval_num_steps = 40
     # config.sample.guidance_scale = 4.5
     config.sample.guidance_scale = 7.0
-    config.sample.init_same_noise = True
 
     # 8 cards to start LLaVA Server
     config.resolution = 512
