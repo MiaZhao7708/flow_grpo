@@ -359,7 +359,7 @@ def eval(pipeline, test_dataloader, text_encoders, tokenizers, config, accelerat
         #         step=global_step,
         #     )
         # 创建保存目录
-        eval_save_dir = config.save_dir.replace('output','eval_step_during_training' )
+        eval_save_dir = config.save_dir.replace('output','eval_step_during_training')
         step_save_dir = os.path.join(eval_save_dir, f"step_{global_step}")
         os.makedirs(step_save_dir, exist_ok=True)
 
@@ -870,13 +870,17 @@ def main(_):
             if i==0 and epoch % config.eval_freq == 0:
             # if i==0 and epoch % config.eval_freq == 0 and epoch>0: # resume_test
                 # eval
-                eval(pipeline, test_dataloader, text_encoders, tokenizers, config, accelerator, global_step, eval_reward_fn, executor, autocast, num_train_timesteps, ema, transformer_trainable_parameters)
+                eval_save_dir = config.save_dir.replace('output','eval_step_during_training')
+                step_save_dir = os.path.join(eval_save_dir, f"step_{global_step}")
+                if not os.path.exists(step_save_dir):
+                    eval(pipeline, test_dataloader, text_encoders, tokenizers, config, accelerator, global_step, eval_reward_fn, executor, autocast, num_train_timesteps, ema, transformer_trainable_parameters, step_save_dir)
             
             if i==0 and epoch % config.save_freq == 0 and epoch>0:
                 save_root = os.path.join(config.save_dir, "checkpoints", f"checkpoint-{global_step}")
-                accelerator.save_state(save_root)
-                if accelerator.is_main_process:
-                    print(f"Model checkpoint and state saved at step {global_step}")
+                if not os.path.exists(save_root):
+                    accelerator.save_state(save_root)
+                    if accelerator.is_main_process:
+                        print(f"Model checkpoint and state saved at step {global_step}")
 
             # 这里是故意的，因为前两个epoch收集的group size会有bug,经过两个epoch后，group_size稳定成指定的
             if epoch < 2:
