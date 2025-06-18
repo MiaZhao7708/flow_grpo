@@ -1009,10 +1009,13 @@ def main(_):
                 )
         samples["rewards"]["ori_avg"] = samples["rewards"]["avg"]
         # kl in reward
+        if config.train.get("reward_strict", False):
+            samples["rewards"]["avg"] = samples["rewards"]["avg"].where(samples["rewards"]["avg"] == 1, 0)
         samples["rewards"]["avg"] = samples["rewards"]["avg"].unsqueeze(-1) - config.sample.kl_reward*samples["kl"]
         # gather rewards across processes
         gathered_rewards = {key: accelerator.gather(value) for key, value in samples["rewards"].items()}
         gathered_rewards = {key: value.cpu().numpy() for key, value in gathered_rewards.items()}
+        print(gathered_rewards['avg'])
         # log rewards and images
         accelerator.log(
             {

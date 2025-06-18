@@ -246,6 +246,7 @@ def geneval_sd3_counting_10_step20_reward_strict():
     config.train.gradient_accumulation_steps = config.sample.num_batches_per_epoch//2 # 24/2=12
     config.train.num_inner_epochs = 1
     config.train.timestep_fraction = 0.99
+    config.train.reward_strict = True
     config.train.beta = 0.01
     config.sample.kl_reward = 0
     config.sample.global_std=True
