@@ -7,12 +7,12 @@ import time
 import json
 import debugpy
 
-# try:
-#     debugpy.listen(('0.0.0.0', 8897))
-#     print(f"Process waiting for debugger to attach on port 8897...")
-#     debugpy.wait_for_client()
-# except Exception as e:
-#     print(f"Debugpy initialization failed: {e}")
+try:
+    debugpy.listen(('0.0.0.0', 8897))
+    print(f"Process waiting for debugger to attach on port 8897...")
+    debugpy.wait_for_client()
+except Exception as e:
+    print(f"Debugpy initialization failed: {e}")
 
 import os
 os.environ['PYDEVD_WARN_SLOW_RESOLVE_TIMEOUT'] = '10.0'  
@@ -873,7 +873,7 @@ def main(_):
                 eval_save_dir = config.save_dir.replace('output','eval_step_during_training')
                 step_save_dir = os.path.join(eval_save_dir, f"step_{global_step}")
                 if not os.path.exists(step_save_dir):
-                    eval(pipeline, test_dataloader, text_encoders, tokenizers, config, accelerator, global_step, eval_reward_fn, executor, autocast, num_train_timesteps, ema, transformer_trainable_parameters, step_save_dir)
+                    eval(pipeline, test_dataloader, text_encoders, tokenizers, config, accelerator, global_step, eval_reward_fn, executor, autocast, num_train_timesteps, ema, transformer_trainable_parameters)
             
             if i==0 and epoch % config.save_freq == 0 and epoch>0:
                 save_root = os.path.join(config.save_dir, "checkpoints", f"checkpoint-{global_step}")
