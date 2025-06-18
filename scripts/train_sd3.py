@@ -1100,18 +1100,19 @@ def main(_):
 
             # shuffle along time dimension independently for each sample
             # custom
-            if config.train.timestep_select_strategy == "first":
+            
+            if config.train.timestep_select_strategy == "random":
+                perms = torch.stack(
+                    [
+                        torch.randperm(num_timesteps, device=accelerator.device)
+                        for _ in range(total_batch_size)
+                    ]
+                ) 
+            else:
                 perms = torch.stack(
                     [
                         # torch.randperm(num_timesteps, device=accelerator.device)
                         torch.arange(num_timesteps, device=accelerator.device)
-                        for _ in range(total_batch_size)
-                    ]
-                ) 
-            elif config.train.timestep_select_strategy == "random":
-                perms = torch.stack(
-                    [
-                        torch.randperm(num_timesteps, device=accelerator.device)
                         for _ in range(total_batch_size)
                     ]
                 ) 

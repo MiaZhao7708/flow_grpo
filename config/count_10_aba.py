@@ -89,6 +89,7 @@ def geneval_sd3_counting_10_step20_init_same_noise():
     # config.sample.guidance_scale = 4.5
     config.sample.guidance_scale = 7.0
     config.sample.init_same_noise = True
+    config.resume_from = '/openseg_blob/zhaoyaqi/workspace/coco80_grpo_counting_sd3_5_medium/output/counting_coco80_10_step20_guidance_7_v5_init_same_noise/checkpoints'
 
     # 8 cards to start LLaVA Server
     config.resolution = 512
