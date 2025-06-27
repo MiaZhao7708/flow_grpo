@@ -131,6 +131,30 @@ You can adjust hyperparameters in `config/dgx.py`. Based on empirical results, w
 
 These settings have shown good performance in practice.
 
+## Pre-trained Models
+
+We provide four pre-trained model variants, each with different characteristics:
+
+```python
+from huggingface_hub import snapshot_download
+
+# Choose one variant from: strict_first, relative_first, strict_random, relative_random
+variant = "strict_first"  # Example: using strict_first variant
+
+# Download the model
+model_path = snapshot_download(
+    repo_id="MiaTiancai/grpo-counting-model",
+    local_dir=f"./grpo_counting_model_{variant}",
+    subfolder=variant
+)
+```
+
+Available variants at [MiaTiancai/grpo-counting-model](https://huggingface.co/MiaTiancai/grpo-counting-model):
+- `strict_first/`: Best for accurate counting, uses first 50 timesteps
+- `relative_first/`: Balanced performance, uses first 50 timesteps
+- `strict_random/`: More diverse generation with accurate counting
+- `relative_random/`: Maximum generation diversity
+
 ## Inference
 
 After training, you can use the inference demo to generate images with your trained LoRA weights.
