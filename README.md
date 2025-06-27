@@ -9,6 +9,49 @@ This project is based on the open-source [Flow-GRPO](https://github.com/MiaZhao7
 3. Optimization of timestep selection strategy for counting
 4. Improved reward design for the counting scenario
 
+## Project Structure
+
+```
+flow_grpo/
+├── config/                     # Training configurations
+│   ├── count_10_aba.py        # Configuration for counting experiments
+│   └── dgx.py                 # Hyperparameter configurations
+│
+├── dataset/                    # Training prompt datasets
+│
+├── flow_grpo/                 # Core Flow-GRPO implementation
+│   ├── diffusers_patch/       # SDE method implementations
+│   └── ...                    # Reward score calculation modules
+│
+├── geneval/                   # GenEval benchmark evaluation code
+│   ├── evaluation/            # Evaluation scripts and metrics
+│   └── generation/            # Generation utilities
+│
+├── scripts/                   # Training scripts and configurations
+│   ├── accelerate_configs/    # Multi-GPU acceleration configs
+│   ├── multi_node/            # Multi-node training scripts
+│   ├── single_node/           # Single-node training scripts
+│   └── train_sd3.py          # Main SD3 training script
+│
+├── sde_diff/                  # SDE and ODE inference codebase
+│
+├── reward-server/             # Reward computation server
+│   ├── reward_server/         # Server implementation
+│   ├── mmdetection/           # Object detection integration
+│   └── test/                  # Testing utilities
+│
+└── ...                        # Additional utilities and configs
+```
+
+**Key Directories:**
+- **config/**: Contains training configurations and hyperparameters
+- **dataset/**: Houses all training datasets, primarily focused on counting tasks
+- **flow_grpo/**: Core implementation including reward score calculation and SDE methods
+- **geneval/**: GenEval benchmark evaluation utilities
+- **scripts/**: Training scripts and acceleration configurations
+- **sde_diff/**: SDE and ODE inference implementations
+- **reward-server/**: Online reward computation service
+
 ## Environment Setup
 
 ### Using Docker (Recommended)
@@ -87,3 +130,44 @@ You can adjust hyperparameters in `config/dgx.py`. Based on empirical results, w
 - Set `config.train.gradient_accumulation_steps = config.sample.num_batches_per_epoch // 2`
 
 These settings have shown good performance in practice.
+
+## Inference
+
+After training, you can use the inference demo to generate images with your trained LoRA weights.
+
+### Usage
+
+```bash
+# Basic usage with random test prompt
+python inference_demo.py --lora_path /path/to/your/lora/weights
+
+# Using custom prompt
+python inference_demo.py \
+    --lora_path /path/to/your/lora/weights \
+    --custom_prompt "A composition of five cats scattered across a neutral gray background"
+
+# Full parameter specification
+python inference_demo.py \
+    --lora_path /path/to/your/lora/weights \
+    --model_name stabilityai/stable-diffusion-3.5-large \
+    --num_images 4 \
+    --height 512 \
+    --width 512 \
+    --num_steps 20 \
+    --guidance_scale 7.5 \
+    --seed 42 \
+    --output_dir ./my_outputs
+```
+
+### Parameters
+
+- `--lora_path`: **Required**. Path to LoRA weights (can be a checkpoint directory or direct LoRA weights directory)
+- `--model_name`: Base model name (default: `stabilityai/stable-diffusion-3.5-large`)
+- `--custom_prompt`: Use a custom prompt instead of randomly selecting from test data
+- `--num_images`: Number of images to generate (default: 4)
+- `--height`, `--width`: Image dimensions (default: 512x512)
+- `--num_steps`: Number of inference steps (default: 20)
+- `--guidance_scale`: Classifier-free guidance scale (default: 7.5)
+- `--seed`: Random seed for reproducibility (default: 42)
+- `--output_dir`: Output directory for generated images (default: `./demo_outputs`)
+- `--device_id`: GPU device ID (default: 0)
