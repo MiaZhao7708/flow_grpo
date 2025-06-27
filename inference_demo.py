@@ -10,7 +10,7 @@ import random
 import torch
 from PIL import Image
 from diffusers import StableDiffusion3Pipeline
-from peft import PeftModel, LoraConfig, get_peft_model
+from peft import PeftModel
 import sys
 from safetensors.torch import load_file
 
@@ -21,7 +21,8 @@ sys.path.append('/openseg_blob/zhaoyaqi/flow_grpo')
 from flow_grpo.diffusers_patch.sd3_pipeline_with_logprob import pipeline_with_logprob
 
 # Use environment variable for Hugging Face token
-huggingface_token = os.getenv('HUGGINGFACE_TOKEN')
+# huggingface_token = os.getenv('HUGGINGFACE_TOKEN')
+huggingface_token = "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"
 
 # Set HuggingFace cache directory
 os.environ['HF_HOME'] = '/detr_blob/liuzeyu/checkpoints/huggingface'
@@ -39,18 +40,12 @@ def build_pipeline(model_name, device_id=0):
     """
     device = torch.device("cuda", index=device_id)
     
-    if 'medium' in model_name:
-        pipeline = StableDiffusion3Pipeline.from_pretrained(
-            model_name, 
-            torch_dtype=torch.bfloat16, 
-            token=huggingface_token
-        )
-    else:
-        pipeline = StableDiffusion3Pipeline.from_pretrained(
-            model_name, 
-            torch_dtype=torch.bfloat16, 
-            cache_dir="/detr_blob/liuzeyu/checkpoints/huggingface"
-        )
+    pipeline = StableDiffusion3Pipeline.from_pretrained(
+        model_name, 
+        torch_dtype=torch.float16, 
+        token=huggingface_token
+    )
+
     
     pipeline.to(device=device)
     return pipeline
@@ -79,73 +74,44 @@ def check_lora_loading_status(transformer):
     total_params = sum(p.numel() for p in transformer.parameters())
     print(f"✓ Total parameters: {total_params:,}")
     
-    # 检查LoRA参数是否存在
-    lora_params = {}
-    for name, param in transformer.named_parameters():
-        if 'lora_' in name:
-            lora_params[name] = param.data.abs().mean().item()
-    
-    if lora_params:
-        print(f"✓ Found {len(lora_params)} LoRA parameters:")
-        for i, (name, mean_val) in enumerate(lora_params.items()):
-            if i < 5:  # 只显示前5个
-                print(f"  - {name}: mean_abs_value = {mean_val:.6f}")
-            elif i == 5:
-                print(f"  - ... and {len(lora_params)-5} more")
-                break
-    else:
-        print("❌ No LoRA parameters found!")
-    
     print("-" * 50)
 
-def load_lora_weights(pipeline, lora_path):
+def load_lora_weights(pipeline, lora_path, device_id=0):
     """
-    Load LoRA weights by manually correcting state dict keys to match diffusers' expectations.
+    Load LoRA weights using PeftModel.
     """
     if not os.path.exists(lora_path):
         raise ValueError(f"LoRA path does not exist: {lora_path}")
 
-    if os.path.isdir(lora_path) and os.path.exists(os.path.join(lora_path, "lora")):
-        lora_weights_path = os.path.join(lora_path, "lora")
-    else:
-        lora_weights_path = lora_path
-
-    print(f"Loading LoRA weights from: {lora_weights_path} with manual key correction.")
+    print(f"Loading LoRA weights from: {lora_path}")
+    print(f"Transformer type before loading: {type(pipeline.transformer)}")
     
-    lora_checkpoint_file = os.path.join(lora_weights_path, "adapter_model.safetensors")
-    if not os.path.exists(lora_checkpoint_file):
-        raise ValueError(f"adapter_model.safetensors not found in {lora_weights_path}")
-
-    # 1. Load the state dict from the safetensors file
-    lora_state_dict = load_file(lora_checkpoint_file, device="cpu")
-    
-    # 2. Correct the keys
-    # The warning "No LoRA keys... with prefix='transformer'" indicates the keys in the
-    # checkpoint don't have the prefix diffusers expects for the transformer model.
-    # We will manually add the 'transformer.' prefix.
-    # The PEFT library adds its own prefixes like 'base_model.model.' during training.
-    pipeline_state_dict = {}
-    for key, value in lora_state_dict.items():
-        if key.startswith("base_model.model."):
-            # Replace the PEFT prefix with the diffusers-expected prefix
-            new_key = "transformer." + key[len("base_model.model."):]
-            pipeline_state_dict[new_key] = value
-        else:
-            # Keep other keys if any, though we only expect transformer keys
-            pipeline_state_dict[key] = value
-
-    # 3. Load the corrected state dict into the pipeline.
-    # This should now work without warnings for the transformer.
-    pipeline.load_lora_weights(pipeline_state_dict)
-
-    # 4. Fuse the weights
-    print("Fusing LoRA weights into the base model...")
-    pipeline.fuse_lora()
-    
-    pipeline.transformer.eval()
-
-    print("✓ LoRA weights loaded via corrected state_dict and fused successfully!")
-
+    try:
+        # Load LoRA weights using PeftModel
+        pipeline.transformer = PeftModel.from_pretrained(
+            pipeline.transformer, 
+            lora_path,
+            torch_dtype=torch.float16,
+            device_map={"": device_id}
+        )
+        print(f"Transformer type after loading: {type(pipeline.transformer)}")
+        print("LoRA config:", pipeline.transformer.peft_config)
+        
+        # Merge and unload LoRA weights
+        print("Merging LoRA weights into the base model...")
+        pipeline.transformer = pipeline.transformer.merge_and_unload()
+        print(f"Transformer type after merging: {type(pipeline.transformer)}")
+        
+        device = torch.device("cuda", index=device_id)
+        pipeline = pipeline.to(device)
+        pipeline.transformer.eval()
+        print("✓ LoRA weights loaded and merged successfully!")
+        return pipeline
+    except Exception as e:
+        print(f"Error loading LoRA weights: {str(e)}")
+        import traceback
+        traceback.print_exc()
+        raise
 
 def load_random_test_prompt(test_file_path):
     """
@@ -177,7 +143,7 @@ def load_random_test_prompt(test_file_path):
     
     return selected_sample
 
-def run_inference(pipeline, prompt, num_images=1, height=512, width=512, num_steps=20, guidance_scale=7.5, seed=42):
+def run_inference(pipeline, prompt, num_images=1, height=512, width=512, num_steps=40, guidance_scale=7.5, seed=42):
     """
     Run inference with the given prompt.
     
@@ -202,31 +168,15 @@ def run_inference(pipeline, prompt, num_images=1, height=512, width=512, num_ste
     print(f"Parameters: {height}x{width}, {num_steps} steps, guidance={guidance_scale}")
     
     with torch.no_grad():
-        # Use the same pipeline_with_logprob function as training code
-        # images, _, _, _ = pipeline_with_logprob(
-        #     pipeline,
-        #     prompt=prompt,
-        #     negative_prompt="",
-        #     num_images_per_prompt=num_images,
-        #     height=height,
-        #     width=width,
-        #     guidance_scale=guidance_scale,
-        #     num_inference_steps=num_steps,
-        #     output_type="pt",
-        #     return_dict=False,
-        #     determistic=True,  # For reproducible results
-        # )
         images = pipeline(
-                prompt=prompt,
-                num_images_per_prompt=num_images,
-                height=height,
-                width=width,
-                guidance_scale=guidance_scale,
-                num_inference_steps=40
-            ).images
-        
-        # Convert from tensor to PIL images
-        # images = pipeline.image_processor.postprocess(images, output_type="pil")
+            prompt=prompt,
+            negative_prompt="",
+            num_images_per_prompt=num_images,
+            height=height,
+            width=width,
+            guidance_scale=guidance_scale,
+            num_inference_steps=num_steps
+        ).images
     
     return images
 
@@ -262,7 +212,7 @@ def main():
     parser.add_argument("--height", type=int, default=512)
     parser.add_argument("--width", type=int, default=512)
     parser.add_argument("--num_steps", type=int, default=40)
-    parser.add_argument("--guidance_scale", type=float, default=7.5)
+    parser.add_argument("--guidance_scale", type=float, default=4.5)
     parser.add_argument("--seed", type=int, default=42)
     parser.add_argument("--device_id", type=int, default=0)
     parser.add_argument("--custom_prompt", type=str, default=None)
@@ -319,7 +269,8 @@ def main():
         print(f"✓ LoRA pipeline built with model: {args.model_name}")
         
         print("\n6. Loading LoRA weights...")
-        load_lora_weights(lora_pipeline, args.lora_path)
+        # load_lora_weights(lora_pipeline, args.lora_path)
+        lora_pipeline = load_lora_weights(lora_pipeline, args.lora_path, args.device_id)
         
         # 7. Run inference with LoRA model
         print("\n7. Running inference with LoRA model...")
