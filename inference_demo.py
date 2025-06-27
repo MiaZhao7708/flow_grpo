@@ -21,8 +21,7 @@ sys.path.append('/openseg_blob/zhaoyaqi/flow_grpo')
 from flow_grpo.diffusers_patch.sd3_pipeline_with_logprob import pipeline_with_logprob
 
 # Use environment variable for Hugging Face token
-# huggingface_token = os.getenv('HUGGINGFACE_TOKEN')
-huggingface_token = "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"
+huggingface_token = os.getenv('HUGGINGFACE_TOKEN')
 
 # Set HuggingFace cache directory
 os.environ['HF_HOME'] = '/detr_blob/liuzeyu/checkpoints/huggingface'
