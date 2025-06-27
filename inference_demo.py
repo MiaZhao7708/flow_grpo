@@ -12,9 +12,13 @@ from PIL import Image
 from diffusers import StableDiffusion3Pipeline
 from peft import PeftModel, LoraConfig, get_peft_model
 import sys
+from safetensors.torch import load_file
 
 # Add the current directory to Python path
 sys.path.append('/openseg_blob/zhaoyaqi/flow_grpo')
+
+# Import the custom pipeline function used in training
+from flow_grpo.diffusers_patch.sd3_pipeline_with_logprob import pipeline_with_logprob
 
 huggingface_token = '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'
 
@@ -95,59 +99,52 @@ def check_lora_loading_status(transformer):
 
 def load_lora_weights(pipeline, lora_path):
     """
-    Load LoRA weights - 完全按照训练代码的逻辑实现
+    Load LoRA weights by manually correcting state dict keys to match diffusers' expectations.
     """
     if not os.path.exists(lora_path):
         raise ValueError(f"LoRA path does not exist: {lora_path}")
-    
-    # 检查路径结构
+
     if os.path.isdir(lora_path) and os.path.exists(os.path.join(lora_path, "lora")):
         lora_weights_path = os.path.join(lora_path, "lora")
     else:
         lora_weights_path = lora_path
+
+    print(f"Loading LoRA weights from: {lora_weights_path} with manual key correction.")
     
-    # 验证LoRA权重文件存在
-    if not (os.path.exists(os.path.join(lora_weights_path, "adapter_config.json")) and 
-            os.path.exists(os.path.join(lora_weights_path, "adapter_model.safetensors"))):
-        raise ValueError(f"Invalid LoRA weights at {lora_weights_path}. Missing adapter_config.json or adapter_model.safetensors")
+    lora_checkpoint_file = os.path.join(lora_weights_path, "adapter_model.safetensors")
+    if not os.path.exists(lora_checkpoint_file):
+        raise ValueError(f"adapter_model.safetensors not found in {lora_weights_path}")
+
+    # 1. Load the state dict from the safetensors file
+    lora_state_dict = load_file(lora_checkpoint_file, device="cpu")
     
-    print(f"Loading LoRA weights from: {lora_weights_path}")
+    # 2. Correct the keys
+    # The warning "No LoRA keys... with prefix='transformer'" indicates the keys in the
+    # checkpoint don't have the prefix diffusers expects for the transformer model.
+    # We will manually add the 'transformer.' prefix.
+    # The PEFT library adds its own prefixes like 'base_model.model.' during training.
+    pipeline_state_dict = {}
+    for key, value in lora_state_dict.items():
+        if key.startswith("base_model.model."):
+            # Replace the PEFT prefix with the diffusers-expected prefix
+            new_key = "transformer." + key[len("base_model.model."):]
+            pipeline_state_dict[new_key] = value
+        else:
+            # Keep other keys if any, though we only expect transformer keys
+            pipeline_state_dict[key] = value
+
+    # 3. Load the corrected state dict into the pipeline.
+    # This should now work without warnings for the transformer.
+    pipeline.load_lora_weights(pipeline_state_dict)
+
+    # 4. Fuse the weights
+    print("Fusing LoRA weights into the base model...")
+    pipeline.fuse_lora()
     
-    # 1. 先初始化PEFT模型 - 与训练代码完全一致
-    target_modules = [
-        "attn.add_k_proj",
-        "attn.add_q_proj",
-        "attn.add_v_proj",
-        "attn.to_add_out",
-        "attn.to_k",
-        "attn.to_out.0",
-        "attn.to_q",
-        "attn.to_v",
-    ]
-    transformer_lora_config = LoraConfig(
-        r=32,
-        lora_alpha=64,
-        init_lora_weights="gaussian",
-        target_modules=target_modules,
-    )
-    
-    # 2. 使用get_peft_model初始化PEFT模型 - 与训练代码一致
-    pipeline.transformer = get_peft_model(pipeline.transformer, transformer_lora_config)
-    
-    # 3. 加载LoRA权重 - 与训练代码load_model_hook_partial一致
-    pipeline.transformer.load_adapter(lora_weights_path, adapter_name="default")
-    pipeline.transformer.set_adapter("default")
-    
-    # 4. 设置为推理模式 - 所有参数不可训练
     pipeline.transformer.eval()
-    for param in pipeline.transformer.parameters():
-        param.requires_grad_(False)
-    
-    print("✓ LoRA weights loaded successfully!")
-    print("✓ Model set to inference mode (all parameters frozen)")
-    
-    # 5. 检查加载状态
-    # check_lora_loading_status(pipeline.transformer)
+
+    print("✓ LoRA weights loaded via corrected state_dict and fused successfully!")
+
 
 def load_random_test_prompt(test_file_path):
     """
@@ -204,14 +201,31 @@ def run_inference(pipeline, prompt, num_images=1, height=512, width=512, num_ste
     print(f"Parameters: {height}x{width}, {num_steps} steps, guidance={guidance_scale}")
     
     with torch.no_grad():
+        # Use the same pipeline_with_logprob function as training code
+        # images, _, _, _ = pipeline_with_logprob(
+        #     pipeline,
+        #     prompt=prompt,
+        #     negative_prompt="",
+        #     num_images_per_prompt=num_images,
+        #     height=height,
+        #     width=width,
+        #     guidance_scale=guidance_scale,
+        #     num_inference_steps=num_steps,
+        #     output_type="pt",
+        #     return_dict=False,
+        #     determistic=True,  # For reproducible results
+        # )
         images = pipeline(
-            prompt=prompt,
-            num_images_per_prompt=num_images,
-            height=height,
-            width=width,
-            guidance_scale=guidance_scale,
-            num_inference_steps=num_steps,
-        ).images
+                prompt=prompt,
+                num_images_per_prompt=num_images,
+                height=height,
+                width=width,
+                guidance_scale=guidance_scale,
+                num_inference_steps=40
+            ).images
+        
+        # Convert from tensor to PIL images
+        # images = pipeline.image_processor.postprocess(images, output_type="pil")
     
     return images
 
@@ -236,26 +250,6 @@ def save_images(images, output_dir, prefix="demo"):
     
     return saved_paths
 
-# def get_model_name_from_lora_path(lora_path):
-#     """从LoRA路径中提取模型名称作为子文件夹名"""
-#     # 从路径中提取有意义的名称
-#     path_parts = lora_path.strip('/').split('/')
-    
-#     # 寻找包含有意义信息的部分
-#     for part in reversed(path_parts):
-#         if 'checkpoint-' in part:
-#             continue  # 跳过checkpoint部分
-#         if part in ['output', 'checkpoints', 'lora']:
-#             continue  # 跳过通用目录名
-#         if len(part) > 10:  # 选择较长的目录名，通常包含更多信息
-#             return part
-    
-#     # 如果没找到合适的，使用倒数第二个非通用目录名
-#     meaningful_parts = [p for p in path_parts if p not in ['output', 'checkpoints', 'lora'] and not p.startswith('checkpoint-')]
-#     if meaningful_parts:
-#         return meaningful_parts[-1]
-    
-#     return "lora_model"
 
 def main():
     parser = argparse.ArgumentParser(description="Flow-GRPO Inference Demo")
@@ -279,24 +273,14 @@ def main():
     print("=" * 60)
     
     try:
-        # 获取模型名称并创建子文件夹
-        # model_name = get_model_name_from_lora_path(args.lora_path)
-        final_output_dir = args.output_dir
-        # final_output_dir = os.path.join(args.output_dir, model_name)
-        # print(f"Model name: {model_name}")
-        # print(f"Output directory: {final_output_dir}")
+        # 创建base和lora子文件夹
+        base_output_dir = os.path.join(args.output_dir, "base")
+        lora_output_dir = os.path.join(args.output_dir, "lora")
+        os.makedirs(base_output_dir, exist_ok=True)
+        os.makedirs(lora_output_dir, exist_ok=True)
         
-        # 1. Build pipeline
-        print("\n1. Building pipeline...")
-        pipeline = build_pipeline(args.model_name, args.device_id)
-        print(f"✓ Pipeline built with model: {args.model_name}")
-        
-        # 2. Load LoRA weights
-        print("\n2. Loading LoRA weights...")
-        load_lora_weights(pipeline, args.lora_path)
-        
-        # 3. Get prompt
-        print("\n3. Preparing prompt...")
+        # 1. Get prompt first
+        print("\n1. Preparing prompt...")
         if args.custom_prompt:
             prompt = args.custom_prompt
             print(f"Using custom prompt: {prompt}")
@@ -304,10 +288,16 @@ def main():
             test_sample = load_random_test_prompt(args.test_file)
             prompt = test_sample['prompt']
         
-        # 4. Run inference
-        print("\n4. Running inference...")
-        images = run_inference(
-            pipeline=pipeline,
+        # 2. 首先使用base model进行推理
+        print("\n=== Running inference with base model ===")
+        print("\n2. Building base pipeline...")
+        base_pipeline = build_pipeline(args.model_name, args.device_id)
+        print(f"✓ Base pipeline built with model: {args.model_name}")
+        
+        # 3. Run inference with base model
+        print("\n3. Running inference with base model...")
+        base_images = run_inference(
+            pipeline=base_pipeline,
             prompt=prompt,
             num_images=args.num_images,
             height=args.height,
@@ -317,14 +307,42 @@ def main():
             seed=args.seed
         )
         
-        # 5. Save results
-        print("\n5. Saving results...")
-        saved_paths = save_images(images, final_output_dir, "demo")
+        # 4. Save base model results
+        print("\n4. Saving base model results...")
+        base_paths = save_images(base_images, base_output_dir, "base")
+        
+        # 5. Now create a new pipeline for LoRA
+        print("\n=== Running inference with LoRA model ===")
+        print("\n5. Building LoRA pipeline...")
+        lora_pipeline = build_pipeline(args.model_name, args.device_id)
+        print(f"✓ LoRA pipeline built with model: {args.model_name}")
+        
+        print("\n6. Loading LoRA weights...")
+        load_lora_weights(lora_pipeline, args.lora_path)
+        
+        # 7. Run inference with LoRA model
+        print("\n7. Running inference with LoRA model...")
+        lora_images = run_inference(
+            pipeline=lora_pipeline,
+            prompt=prompt,
+            num_images=args.num_images,
+            height=args.height,
+            width=args.width,
+            num_steps=args.num_steps,
+            guidance_scale=args.guidance_scale,
+            seed=args.seed
+        )
+        
+        # 8. Save LoRA model results
+        print("\n8. Saving LoRA model results...")
+        lora_paths = save_images(lora_images, lora_output_dir, "lora")
         
         print("\n" + "=" * 60)
         print("✓ Demo completed successfully!")
-        print(f"✓ Generated {len(images)} images")
-        print(f"✓ Results saved to: {final_output_dir}")
+        print(f"✓ Generated {len(base_images)} images with base model")
+        print(f"✓ Generated {len(lora_images)} images with LoRA model")
+        print(f"✓ Base model results saved to: {base_output_dir}")
+        print(f"✓ LoRA model results saved to: {lora_output_dir}")
         print("=" * 60)
         
     except Exception as e:
