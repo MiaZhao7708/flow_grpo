@@ -1,4 +1,4 @@
-# Flow-GRPO: Training Flow Matching Models via Online RL
+# Integrating Flow-GRPO with Numerosity Control in Diffusion Models
 
 ## Project Description
 This project is based on the open-source [Flow-GRPO](https://github.com/MiaZhao7708/flow_grpo/tree/main) codebase, with our modifications available at: [feature/v01_sd_grpo](https://github.com/MiaZhao7708/flow_grpo/tree/feature/v01_sd_grpo)
