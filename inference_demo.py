@@ -20,7 +20,8 @@ sys.path.append('/openseg_blob/zhaoyaqi/flow_grpo')
 # Import the custom pipeline function used in training
 from flow_grpo.diffusers_patch.sd3_pipeline_with_logprob import pipeline_with_logprob
 
-huggingface_token = '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'
+# Use environment variable for Hugging Face token
+huggingface_token = os.getenv('HUGGINGFACE_TOKEN')
 
 # Set HuggingFace cache directory
 os.environ['HF_HOME'] = '/detr_blob/liuzeyu/checkpoints/huggingface'
