@@ -317,7 +317,7 @@ def geneval_sd3_counting_10_step20_reward_strict_first_50():
 
 def geneval_sd3_counting_20_step20_reward_strict_first_50():
     config = compressibility()
-    config.dataset = os.path.join(os.getcwd(), "dataset/counting")
+    config.dataset = os.path.join(os.getcwd(), "dataset/counting_20")
     config.run_name = "0630_counting_coco80_20_step20_guidance_7_v5_reward_strict_first_50_aigc11"
     # config.resume_from = '/openseg_blob/zhaoyaqi/workspace/coco80_grpo_counting_sd3_5_medium/output/0630_counting_coco80_20_step20_guidance_7_v5_reward_strict_first_50_aigc11/checkpoints'
 
@@ -366,7 +366,7 @@ def geneval_sd3_counting_20_step20_reward_strict_first_50():
 
 def geneval_sd3_counting_40_step20_reward_strict_first_50():
     config = compressibility()
-    config.dataset = os.path.join(os.getcwd(), "dataset/counting")
+    config.dataset = os.path.join(os.getcwd(), "dataset/counting_40")
     config.run_name = "0630_counting_coco80_40_step20_guidance_7_v5_reward_strict_first_50_aigc11"
     # config.resume_from = '/openseg_blob/zhaoyaqi/workspace/coco80_grpo_counting_sd3_5_medium/output/0630_counting_coco80_20_step20_guidance_7_v5_reward_strict_first_50_aigc11/checkpoints'
 
