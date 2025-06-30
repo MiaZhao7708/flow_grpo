@@ -66,11 +66,11 @@ def split_dataset(input_file, train_output, test_output, min_num, max_num,test_s
         print(f"Count {count}: {test_distribution[count]} samples")
 
 def main():
-    min_num = 6
-    max_num = 10
-    input_file = f"/openseg_blob/zhaoyaqi/flow_grpo/dataset/counting_{min_num}_{max_num}/metadata_{min_num}_{max_num}.jsonl"
-    train_output = f"/openseg_blob/zhaoyaqi/flow_grpo/dataset/counting_{min_num}_{max_num}/train_metadata.jsonl"
-    test_output = f"/openseg_blob/zhaoyaqi/flow_grpo/dataset/counting_{min_num}_{max_num}/test_metadata.jsonl"
+    min_num = 1
+    max_num = 40
+    input_file = f"/openseg_blob/zhaoyaqi/flow_grpo/dataset/counting_{max_num}/metadata_{min_num}_{max_num}.jsonl"
+    train_output = f"/openseg_blob/zhaoyaqi/flow_grpo/dataset/counting_{max_num}/train_metadata.jsonl"
+    test_output = f"/openseg_blob/zhaoyaqi/flow_grpo/dataset/counting_{max_num}/test_metadata.jsonl"
     
     # 创建输出目录
     Path(train_output).parent.mkdir(parents=True, exist_ok=True)

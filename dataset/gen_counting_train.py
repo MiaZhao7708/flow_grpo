@@ -144,10 +144,10 @@ def generate_metadata(object_names, output_file, min_num, max_num):
 def main():
     # 设置路径
     import os
-    min_num = 6
-    max_num = 10
+    min_num = 1
+    max_num = 40
     object_names_path = "/openseg_blob/zhaoyaqi/flow_grpo/reward-server/reward_server/object_names.txt"
-    output_path = f"/openseg_blob/zhaoyaqi/flow_grpo/dataset/counting_{min_num}_{max_num}/metadata_{min_num}_{max_num}.jsonl"
+    output_path = f"/openseg_blob/zhaoyaqi/flow_grpo/dataset/counting_{max_num}/metadata_{min_num}_{max_num}.jsonl"
     os.makedirs(os.path.dirname(output_path), exist_ok=True)
     
     # 确保输出目录存在
