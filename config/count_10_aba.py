@@ -269,7 +269,7 @@ def geneval_sd3_counting_10_step20_reward_strict():
 def geneval_sd3_counting_5_step20_reward_strict_first_50():
     config = compressibility()
     config.dataset = os.path.join(os.getcwd(), "dataset/counting_5")
-    config.run_name = "0701_counting_coco80_5_step20_guidance_7_v5_reward_strict_first_50_aigc11"
+    config.run_name = "0701_counting_coco80_5_step20_guidance_7_v5_reward_strict_first_50_aigc10"
     # config.resume_from = '/openseg_blob/zhaoyaqi/workspace/coco80_grpo_counting_sd3_5_medium/output/counting_coco80_10_step20_guidance_7_v5_reward_strict_first_50/checkpoints/checkpoint-1656'
 
     # sd3.5 medium
