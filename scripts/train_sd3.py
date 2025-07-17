@@ -1015,7 +1015,7 @@ def main(_):
         # gather rewards across processes
         gathered_rewards = {key: accelerator.gather(value) for key, value in samples["rewards"].items()}
         gathered_rewards = {key: value.cpu().numpy() for key, value in gathered_rewards.items()}
-        print(gathered_rewards['avg'])
+        # print(gathered_rewards['avg'])
         # log rewards and images
         accelerator.log(
             {
